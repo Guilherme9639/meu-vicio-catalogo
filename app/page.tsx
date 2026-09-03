@@ -58,7 +58,7 @@ export default function Home() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [heroSlide, setHeroSlide] = useState(0);
   useEffect(() => {
-    const timer = window.setInterval(() => setHeroSlide((current) => (current + 1) % 3), 3500);
+    const timer = window.setInterval(() => setHeroSlide((current) => (current + 1) % 3), 5000);
     return () => window.clearInterval(timer);
   }, []);
   const visibleSizeOptions = useMemo(() => category === 'Adulto' ? adultSizeOptions : category === 'Infantil' ? infantSizeOptions : sizeOptions, [category]);
