@@ -1,4 +1,8 @@
 'use client';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Check, ChevronDown, Filter, Heart, Menu, MessageCircle, Minus, Plus, Search, ShoppingBag, Sparkles, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
 
 
 type Product = { id: string; name: string; category: string; color: string; price: number; description: string; image: string; sizes: Record<number, number>; tag?: string };
