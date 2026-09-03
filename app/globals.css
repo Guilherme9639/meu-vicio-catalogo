@@ -172,6 +172,7 @@ a { color: inherit; text-decoration: none; }
 .drawer-total { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #ecdfd5; padding: 18px 23px 11px; color: #876f62; font-size: 12px; }
 .drawer-total strong { color: #356650; font-size: 20px; }
 .whatsapp-button { margin: 0 23px; border: 0; background: #2e8a5d; color: white; padding: 14px 16px; }
+.continue-shopping-button { width: calc(100% - 46px); margin: 9px 23px 0; }
 .drawer-note { margin: 12px 23px 24px; color: #a68d80; font-size: 10px; line-height: 1.5; text-align: center; }
 .empty-cart { display: grid; flex: 1; place-items: center; align-content: center; gap: 8px; padding: 30px; color: #a37968; text-align: center; }
 .empty-cart h3 { margin: 6px 0 0; color: #4d3a31; font-family: var(--font-display); font-size: 23px; font-weight: 500; }
