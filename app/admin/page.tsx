@@ -19,7 +19,7 @@ const adminSizes: SizeOption[] = [
   { label: '20/21', values: [20, 21] }, { label: '22/23', values: [22, 23] },
   { label: '24/25', values: [24, 25] }, { label: '26/27', values: [26, 27] },
   { label: '28/29', values: [28, 29] }, { label: '30/31', values: [30, 31] },
-  { label: '32', values: [32] }, { label: '33/34', values: [33, 34] },
+  { label: '32/33', values: [32, 33] }, { label: '33/34', values: [33, 34] },
   { label: '35/36', values: [35, 36] }, { label: '37/38', values: [37, 38] },
   { label: '39/40', values: [39, 40] }, { label: '41/42', values: [41, 42] },
   { label: '43/44', values: [43, 44] }, { label: '45/46', values: [45, 46] },
