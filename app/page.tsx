@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, ChevronDown, Filter, Heart, Menu, MessageCircle, Minus, Plus, Search, ShoppingBag, Sparkles, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-type Product = { id: number; name: string; category: string; color: string; price: number; description: string; image: string; sizes: Record<number, number>; tag?: string };
+type Product = { id: string; name: string; category: string; color: string; price: number; description: string; image: string; sizes: Record<number, number>; tag?: string };
 type CartItem = Product & { selectedSize: number; quantity: number };
 
 const WHATSAPP_NUMBER = '5531994483976';
@@ -11,12 +12,12 @@ const WHATSAPP_CONTACTS = [
   { id: 'atendimento-1', name: 'Atendimento 1', number: '5531994483976', detail: '(31) 99448-3976', demo: false },
   { id: 'atendimento-2', name: 'Atendimento 2', number: '5531999999999', detail: 'Número de demonstração', demo: true },
 ];
-const sizes = [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
+const sizes = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
 const products: Product[] = [
-  { id: 1, name: 'Brasil Logo Branco', category: 'Havaianas', color: 'Branco', price: 39.9, description: 'O clássico brasileiro para todos os dias.', image: '/products/havaianas-branco.png', sizes: { 33: 2, 34: 0, 35: 4, 36: 3, 37: 5, 38: 2, 39: 0, 40: 1 }, tag: 'Mais vendido' },
-  { id: 2, name: 'Top Rosé', category: 'Havaianas', color: 'Rosé', price: 34.9, description: 'Leve, confortável e com cor para destacar o look.', image: '/products/havaianas-branco.png', sizes: { 33: 0, 34: 2, 35: 0, 36: 4, 37: 2, 38: 3, 39: 2, 40: 0 }, tag: 'Novidade' },
-  { id: 3, name: 'Slim Preto', category: 'Havaianas', color: 'Preto', price: 44.9, description: 'Tiras finas e visual versátil para combinar com tudo.', image: '/products/havaianas-branco.png', sizes: { 33: 1, 34: 1, 35: 2, 36: 0, 37: 3, 38: 4, 39: 2, 40: 1 } },
-  { id: 4, name: 'Top Max Comfort', category: 'Havaianas', color: 'Azul marinho', price: 59.9, description: 'Mais conforto para acompanhar a rotina com leveza.', image: '/products/havaianas-branco.png', sizes: { 33: 0, 34: 0, 35: 2, 36: 2, 37: 1, 38: 0, 39: 3, 40: 2 }, tag: 'Conforto' },
+  { id: 'demo-1', name: 'Brasil Logo Branco', category: 'Havaianas', color: 'Branco', price: 39.9, description: 'O clássico brasileiro para todos os dias.', image: '/products/havaianas-branco.png', sizes: { 33: 2, 34: 0, 35: 4, 36: 3, 37: 5, 38: 2, 39: 0, 40: 1 }, tag: 'Mais vendido' },
+  { id: 'demo-2', name: 'Top Rosé', category: 'Havaianas', color: 'Rosé', price: 34.9, description: 'Leve, confortável e com cor para destacar o look.', image: '/products/havaianas-branco.png', sizes: { 33: 0, 34: 2, 35: 0, 36: 4, 37: 2, 38: 3, 39: 2, 40: 0 }, tag: 'Novidade' },
+  { id: 'demo-3', name: 'Slim Preto', category: 'Havaianas', color: 'Preto', price: 44.9, description: 'Tiras finas e visual versátil para combinar com tudo.', image: '/products/havaianas-branco.png', sizes: { 33: 1, 34: 1, 35: 2, 36: 0, 37: 3, 38: 4, 39: 2, 40: 1 } },
+  { id: 'demo-4', name: 'Top Max Comfort', category: 'Havaianas', color: 'Azul marinho', price: 59.9, description: 'Mais conforto para acompanhar a rotina com leveza.', image: '/products/havaianas-branco.png', sizes: { 33: 0, 34: 0, 35: 2, 36: 2, 37: 1, 38: 0, 39: 3, 40: 2 }, tag: 'Conforto' },
 ];
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -31,14 +32,26 @@ export default function Home() {
   const [search, setSearch] = useState('');
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState(products);
   const [cartOpen, setCartOpen] = useState(false);
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const filteredProducts = useMemo(() => products.filter((product) => { const term = search.trim().toLowerCase(); return (category === 'Todos' || product.category === category) && (selectedSize === null || (product.sizes[selectedSize] ?? 0) > 0) && (!term || `${product.name} ${product.color}`.toLowerCase().includes(term)); }), [category, search, selectedSize]);
+  useEffect(() => {
+    let mounted = true;
+    async function loadCatalog() {
+      if (!supabase) return;
+      const { data, error } = await supabase.from('products').select('id,name,category,color,price,description,image_url,product_sizes(size,quantity)').eq('is_active', true).order('created_at', { ascending: false });
+      if (error || !data?.length || !mounted) return;
+      setCatalogProducts(data.map((row) => ({ id: row.id, name: row.name, category: row.category, color: row.color || 'Sem cor', price: Number(row.price), description: row.description || 'Confira os detalhes deste modelo.', image: row.image_url || '/products/havaianas-branco.png', sizes: Object.fromEntries((row.product_sizes || []).map((item: { size: number; quantity: number }) => [item.size, item.quantity])) })));
+    }
+    loadCatalog();
+    return () => { mounted = false; };
+  }, []);
+  const filteredProducts = useMemo(() => catalogProducts.filter((product) => { const term = search.trim().toLowerCase(); return (category === 'Todos' || product.category === category) && (selectedSize === null || (product.sizes[selectedSize] ?? 0) > 0) && (!term || `${product.name} ${product.color}`.toLowerCase().includes(term)); }), [catalogProducts, category, search, selectedSize]);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   function addToCart(product: Product, size: number) { setCart((current) => { const existing = current.find((item) => item.id === product.id && item.selectedSize === size); if (existing) return current.map((item) => item.id === product.id && item.selectedSize === size ? { ...item, quantity: item.quantity + 1 } : item); return [...current, { ...product, selectedSize: size, quantity: 1 }]; }); setActiveProduct(null); setCartOpen(true); }
-  function updateQuantity(id: number, size: number, direction: number) { setCart((current) => current.map((item) => item.id === id && item.selectedSize === size ? { ...item, quantity: item.quantity + direction } : item).filter((item) => item.quantity > 0)); }
+  function updateQuantity(id: string, size: number, direction: number) { setCart((current) => current.map((item) => item.id === id && item.selectedSize === size ? { ...item, quantity: item.quantity + direction } : item).filter((item) => item.quantity > 0)); }
   function sendToWhatsApp(number: string) { if (!cart.length) return; const lines = cart.map((item) => `- ${item.name} | tamanho ${item.selectedSize} | qtd. ${item.quantity} | ${money(item.price * item.quantity)}`); const message = ['Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido:', '', ...lines, '', `Total estimado: ${money(cartTotal)}`, '', 'Podem confirmar a disponibilidade e as formas de pagamento?'].join('\n'); window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank'); }
 
   return <main className="min-h-screen overflow-x-hidden bg-[#f8f3ec] text-[#2e251f]">

@@ -1,27 +1,62 @@
 'use client';
 
-import { ChangeEvent, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Bell, Check, ChevronDown, ImagePlus, LayoutDashboard, MoreHorizontal, Package, Plus, Search, Settings2, ShoppingBag, Tags, Upload, X } from 'lucide-react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
-type AdminProduct = { id: number; name: string; category: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: number[]; image: string };
+type AdminProduct = { id: string; name: string; category: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: number[]; image: string };
 const initialProducts: AdminProduct[] = [
-  { id: 1, name: 'Brasil Logo Branco', category: 'Havaianas', price: 'R$ 39,90', stock: 17, status: 'Ativo', sizes: [33, 35, 36, 37, 38, 40], image: '/products/havaianas-branco.png' },
-  { id: 2, name: 'Top Rosé', category: 'Havaianas', price: 'R$ 34,90', stock: 13, status: 'Ativo', sizes: [34, 36, 37, 38, 39], image: '/products/havaianas-branco.png' },
-  { id: 3, name: 'Slim Preto', category: 'Havaianas', price: 'R$ 44,90', stock: 14, status: 'Ativo', sizes: [33, 34, 35, 37, 38, 39, 40], image: '/products/havaianas-branco.png' },
-  { id: 4, name: 'Top Max Comfort', category: 'Havaianas', price: 'R$ 59,90', stock: 10, status: 'Rascunho', sizes: [35, 36, 37, 39, 40], image: '/products/havaianas-branco.png' },
+  { id: 'demo-1', name: 'Brasil Logo Branco', category: 'Havaianas', price: 'R$ 39,90', stock: 17, status: 'Ativo', sizes: [33, 35, 36, 37, 38, 40], image: '/products/havaianas-branco.png' },
+  { id: 'demo-2', name: 'Top Rosé', category: 'Havaianas', price: 'R$ 34,90', stock: 13, status: 'Ativo', sizes: [34, 36, 37, 38, 39], image: '/products/havaianas-branco.png' },
+  { id: 'demo-3', name: 'Slim Preto', category: 'Havaianas', price: 'R$ 44,90', stock: 14, status: 'Ativo', sizes: [33, 34, 35, 37, 38, 39, 40], image: '/products/havaianas-branco.png' },
+  { id: 'demo-4', name: 'Top Max Comfort', category: 'Havaianas', price: 'R$ 59,90', stock: 10, status: 'Rascunho', sizes: [35, 36, 37, 39, 40], image: '/products/havaianas-branco.png' },
 ];
-const adminSizes = [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
+const adminSizes = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
 
 export default function AdminPage() {
   const [items, setItems] = useState(initialProducts);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(Boolean(supabase));
+  const [authForm, setAuthForm] = useState({ email: '', password: '' });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [importNotice, setImportNotice] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: '', category: 'Havaianas', price: '', description: '', sizes: [] as number[], image: '/products/havaianas-branco.png' });
+  useEffect(() => {
+    if (!supabase) { setLoading(false); return; }
+    let mounted = true;
+    async function initialize() {
+      const { data } = await supabase.auth.getSession();
+      if (mounted) setSession(data.session);
+      if (mounted) setLoading(false);
+    }
+    initialize();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => setSession(currentSession));
+    return () => { mounted = false; listener.subscription.unsubscribe(); };
+  }, []);
+  useEffect(() => {
+    if (!supabase || !session) return;
+    let mounted = true;
+    async function loadProducts() {
+      const { data } = await supabase.from('products').select('id,name,category,price,is_active,image_url,product_sizes(size,quantity)').order('created_at', { ascending: false });
+      if (!mounted || !data?.length) return;
+      setItems(data.map((row) => ({ id: row.id, name: row.name, category: row.category, price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: (row.product_sizes || []).reduce((total: number, item: { quantity: number }) => total + item.quantity, 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: (row.product_sizes || []).filter((item: { quantity: number }) => item.quantity > 0).map((item: { size: number }) => item.size), image: row.image_url || '/products/havaianas-branco.png' })));
+    }
+    loadProducts();
+    return () => { mounted = false; };
+  }, [session]);
   const visibleItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())), [items, search]);
-  function handleImage(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; setForm((current) => ({ ...current, image: URL.createObjectURL(file) })); }
+  async function signIn(event: FormEvent) { event.preventDefault(); if (!supabase) return; setAuthLoading(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword(authForm); if (error) setAuthError('Não foi possível entrar. Confira seu e-mail e senha.'); setAuthLoading(false); }
+  function handleImage(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; setImageFile(file); setForm((current) => ({ ...current, image: URL.createObjectURL(file) })); }
   function toggleSize(size: number) { setForm((current) => ({ ...current, sizes: current.sizes.includes(size) ? current.sizes.filter((item) => item !== size) : [...current.sizes, size] })); }
-  function saveProduct() { if (!form.name.trim() || !form.price.trim()) return; setItems((current) => [...current, { id: Date.now(), name: form.name, category: form.category, price: `R$ ${form.price}`, stock: form.sizes.length, status: 'Rascunho', sizes: form.sizes, image: form.image }]); setForm({ name: '', category: 'Havaianas', price: '', description: '', sizes: [], image: '/products/havaianas-branco.png' }); setShowForm(false); }
+  async function saveProduct() { if (!form.name.trim() || !form.price.trim()) return; if (supabase && session) { const numericPrice = Number(form.price.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0; let imageUrl: string | null = form.image.startsWith('blob:') ? null : form.image; if (imageFile) { const path = `${crypto.randomUUID()}-${imageFile.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`; const upload = await supabase.storage.from('product-images').upload(path, imageFile, { contentType: imageFile.type, upsert: false }); if (upload.error) return; imageUrl = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl; } const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, price: numericPrice, description: form.description.trim(), image_url: imageUrl, is_active: true }).select('id').single(); if (inserted.error || !inserted.data) return; if (form.sizes.length) await supabase.from('product_sizes').insert(form.sizes.map((size) => ({ product_id: inserted.data.id, size, quantity: 1 }))); setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: form.sizes.length, status: 'Ativo', sizes: form.sizes, image: imageUrl || '/products/havaianas-branco.png' }, ...current]); } else { setItems((current) => [...current, { id: String(Date.now()), name: form.name, category: form.category, price: `R$ ${form.price}`, stock: form.sizes.length, status: 'Rascunho', sizes: form.sizes, image: form.image }]); } setForm({ name: '', category: 'Havaianas', price: '', description: '', sizes: [], image: '/products/havaianas-branco.png' }); setImageFile(null); setShowForm(false); }
+
+  if (supabase && loading) return <main className="admin-auth-shell"><div className="admin-auth-card"><span className="admin-brand-mark">mv</span><h1>Carregando painel</h1><p>Preparando a conexão segura com a loja.</p></div></main>;
+  if (supabase && !session) return <main className="admin-auth-shell"><form className="admin-auth-card" onSubmit={signIn}><span className="admin-brand-mark">mv</span><span className="admin-kicker">acesso restrito</span><h1>Painel da loja</h1><p>Entre com o usuário administrador do Supabase para gerenciar produtos e estoque.</p><label>E-mail<input type="email" required value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} placeholder="seu@email.com" /></label><label>Senha<input type="password" required value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} placeholder="Sua senha" /></label>{authError && <small className="auth-error">{authError}</small>}<button type="submit" className="new-product-button" disabled={authLoading}>{authLoading ? 'Entrando...' : 'Entrar no painel'}</button><a href="/" className="auth-back-link">Voltar ao catálogo</a></form></main>;
 
   return <main className="admin-shell">
     <aside className="admin-sidebar"><a href="/" className="admin-brand"><span className="admin-brand-mark">mv</span><span><strong>MEU VÍCIO</strong><small>painel da loja</small></span></a><div className="admin-menu-label">menu principal</div><nav className="admin-menu"><a className="active" href="#visao-geral"><LayoutDashboard size={17} /> Visão geral</a><a href="#produtos"><Package size={17} /> Produtos <span>4</span></a><a href="#categorias"><Tags size={17} /> Categorias</a><a href="#pedidos"><ShoppingBag size={17} /> Pedidos</a></nav><div className="admin-menu-label settings-label">configurações</div><nav className="admin-menu"><a href="#configuracoes"><Settings2 size={17} /> Preferências</a></nav><div className="admin-sidebar-bottom"><div className="admin-user-avatar">MV</div><div><strong>Meu Vício</strong><span>Administrador</span></div><MoreHorizontal size={17} /></div></aside>
