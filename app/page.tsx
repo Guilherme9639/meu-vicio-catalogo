@@ -76,6 +76,10 @@ export default function Home() {
     const timer = window.setInterval(() => setHeroSlide((current) => (current + 1) % 3), 5000);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    document.documentElement.dataset.heroSlide = String(heroSlide);
+    return () => { delete document.documentElement.dataset.heroSlide; };
+  }, [heroSlide]);
   const visibleSizeOptions = useMemo(() => category === 'Adulto' ? adultSizeOptions : category === 'Infantil' ? infantSizeOptions : sizeOptions, [category]);
   const catalogCategories = useMemo(() => {
     const available = new Set(catalogProducts.map((product) => product.category));
