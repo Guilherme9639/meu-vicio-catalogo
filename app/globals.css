@@ -267,7 +267,10 @@ a { color: inherit; text-decoration: none; }
 .admin-toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
 .admin-search { display: flex; flex: 1; align-items: center; gap: 9px; border: 1px solid #e1e8e5; border-radius: 8px; background: #fff; color: #9caaa5; padding: 9px 12px; }
 .admin-search input { width: 100%; border: 0; outline: 0; color: #3a4b46; font-size: 11px; }
-.status-filter { display: inline-flex; align-items: center; gap: 12px; border: 1px solid #e1e8e5; border-radius: 8px; background: #fff; color: #72837d; padding: 9px 12px; font-size: 11px; cursor: pointer; }
+.status-filter { position: relative; display: inline-flex; align-items: center; gap: 9px; border: 1px solid #e1e8e5; border-radius: 8px; background: #fff; color: #72837d; padding: 7px 10px 7px 12px; font-size: 11px; cursor: pointer; }
+.status-filter span { color: #a0ada8; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.status-filter select { border: 0; outline: 0; appearance: none; background: transparent; color: #536a60; cursor: pointer; font: inherit; padding-right: 5px; }
+.admin-inline-field { display: grid; gap: 7px; }
 .products-table-wrap { overflow-x: auto; border: 1px solid #e2e8e5; border-radius: 13px; background: #fff; }
 .products-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 11px; }
 .products-table th { border-bottom: 1px solid #e5eae8; background: #fbfcfb; color: #96a39f; padding: 12px 15px; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
@@ -288,11 +291,14 @@ a { color: inherit; text-decoration: none; }
 .status.active { background: #e8f4ed; color: #408162; }
 .status.draft { background: #f4eee5; color: #a77b4c; }
 .row-menu { border: 0; background: transparent; color: #99a7a3; cursor: pointer; }
+.row-actions { display: flex; align-items: center; gap: 2px; }
 .admin-help-card { display: flex; align-items: center; gap: 15px; margin-top: 21px; border: 1px solid #dfeae4; border-radius: 13px; background: #eef7f2; padding: 18px; }
 .help-illustration { display: grid; height: 47px; width: 47px; flex: 0 0 47px; place-items: center; border-radius: 12px; background: #d5ebdf; color: #4e906f; }
 .admin-help-card h3 { margin: 0; color: #365548; font-family: var(--font-display); font-size: 19px; font-weight: 500; }
 .admin-help-card p { max-width: 520px; margin: 5px 0 0; color: #729083; font-size: 11px; line-height: 1.45; }
 .secondary-admin-button { margin-left: auto; border: 1px solid #bddacb; background: transparent; color: #458064; white-space: nowrap; }
+.admin-action-message { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; border: 1px solid #cfe7d9; border-radius: 10px; background: #f0faf4; color: #3e7458; padding: 11px 13px; font-size: 11px; font-weight: 700; }
+.admin-action-message button { display: grid; margin-left: auto; border: 0; background: transparent; color: #719886; cursor: pointer; padding: 1px; }
 .import-notice { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 19px; border: 1px solid #cfe7d9; border-radius: 11px; background: #f0faf4; padding: 13px 15px; }
 .import-notice > div { display: flex; align-items: start; gap: 10px; }
 .notice-icon { display: grid; height: 24px; width: 24px; place-items: center; border-radius: 50%; background: #d8efdf; color: #3a8a60; }
@@ -325,6 +331,9 @@ a { color: inherit; text-decoration: none; }
 .admin-size input { position: absolute; opacity: 0; }
 .admin-size span { display: grid; height: 32px; min-width: 32px; place-items: center; border: 1px solid #dce7e1; border-radius: 6px; background: #fff; color: #6a7d74; font-size: 10px; }
 .admin-size.selected span { border-color: #4c906d; background: #e4f2e9; color: #397456; font-weight: 800; }
+.admin-size.selected { display: inline-flex; align-items: center; gap: 5px; }
+.admin-size .size-quantity-input { position: static; display: block; width: 46px; margin: 0; border: 1px solid #cfe2d6; border-radius: 6px; background: #fff; color: #3f6e57; padding: 7px 5px; font-size: 11px; opacity: 1; }
+.order-status-select { border: 1px solid #d8e6df; border-radius: 7px; background: #f8fcf9; color: #4b765f; cursor: pointer; padding: 6px 7px; font-size: 10px; font-weight: 800; }
 .admin-form-footer { display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid #e7ecea; padding: 15px 25px; }
 .cancel-button { border: 1px solid #dbe5e0; background: white; color: #71857c; }
 
