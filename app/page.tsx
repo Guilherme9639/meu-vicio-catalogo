@@ -88,9 +88,9 @@ export default function Home() {
     let mounted = true;
     async function loadCatalog() {
       if (!supabase) return;
-      const { data } = await supabase.from('products').select('id,name,category,price,description,image_url,product_sizes(size,quantity)').eq('is_active', true).order('created_at', { ascending: false });
+      const { data } = await supabase.from('products').select('id,name,category,color,price,description,image_url,product_sizes(size,quantity)').eq('is_active', true).order('created_at', { ascending: false });
       if (!mounted) return;
-      setCatalogProducts((data || []).map((row) => ({ id: row.id, name: row.name, category: String(row.category || 'Adulto'), color: 'Sem cor', price: Number(row.price), description: row.description || 'Confira os detalhes deste modelo.', image: row.image_url || '/products/havaianas-branco.png', sizes: Object.fromEntries((row.product_sizes || []).map((item: { size: number; quantity: number }) => [item.size, item.quantity])) })));
+      setCatalogProducts((data || []).map((row) => ({ id: row.id, name: row.name, category: String(row.category || 'Adulto'), color: row.color || 'Sem cor', price: Number(row.price), description: row.description || 'Confira os detalhes deste modelo.', image: row.image_url || '/products/havaianas-branco.png', sizes: Object.fromEntries((row.product_sizes || []).map((item: { size: number; quantity: number }) => [item.size, item.quantity])) })));
       setCatalogLoading(false);
     }
     loadCatalog();
