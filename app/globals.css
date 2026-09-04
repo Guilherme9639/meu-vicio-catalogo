@@ -74,6 +74,9 @@ a { color: inherit; text-decoration: none; }
 .hero-product-orbit { position: absolute; z-index: 0; right: 5%; top: 9%; height: 78%; width: 61%; border: 1px solid rgba(216, 155, 134, .5); border-radius: 50%; transform: rotate(-16deg); }
 .hero-product-copy { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 5px; padding: 35px 0 0 35px; }
 .hero-product-copy span { color: #b46654; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+:root[data-hero-slide="1"] .hero-product-copy > span, :root[data-hero-slide="2"] .hero-product-copy > span { display: none; }
+:root[data-hero-slide="1"] .hero-product-card { background: rgba(244, 229, 220, .58); }
+:root[data-hero-slide="2"] .hero-product-card { background: rgba(224, 237, 229, .58); }
 .hero-product-copy strong { font-family: var(--font-display); font-size: 25px; font-weight: 500; line-height: 1.05; }
 .hero-product-copy small { margin-top: 9px; color: #856c60; font-size: 12px; }
 .hero-size-note { position: absolute; z-index: 2; bottom: 22px; left: 29px; color: #81695c; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
