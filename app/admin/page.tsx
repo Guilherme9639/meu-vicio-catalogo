@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 type SizeOption = { label: string; values: number[] };
 type AdminProduct = { id: string; name: string; category: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; image: string };
+type AdminCategory = { id: string; name: string };
 const initialProducts: AdminProduct[] = [
   { id: 'demo-1', name: 'Brasil Logo Branco', category: 'Adulto', price: 'R$ 39,90', stock: 17, status: 'Ativo', sizes: ['33/34', '35/36', '37/38', '39/40'], image: '/products/havaianas-branco.png' },
   { id: 'demo-2', name: 'Top Rosé', category: 'Adulto', price: 'R$ 34,90', stock: 13, status: 'Ativo', sizes: ['33/34', '35/36', '37/38', '39/40'], image: '/products/havaianas-branco.png' },
@@ -36,6 +37,10 @@ export default function AdminPage() {
   const [showForm, setShowForm] = useState(false);
   const [importNotice, setImportNotice] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [categories, setCategories] = useState<AdminCategory[]>([{ id: 'adulto', name: 'Adulto' }, { id: 'infantil', name: 'Infantil' }]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+  const [categorySaving, setCategorySaving] = useState(false);
   const [form, setForm] = useState({ name: '', category: 'Adulto', price: '', description: '', sizes: [] as string[], image: '/products/havaianas-branco.png' });
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
@@ -52,28 +57,50 @@ export default function AdminPage() {
   useEffect(() => {
     if (!supabase || !session) return;
     let mounted = true;
+    async function loadCategories() {
+      const { data } = await supabase.from('categories').select('id,name').order('name', { ascending: true });
+      if (mounted && data?.length) setCategories(data as AdminCategory[]);
+    }
     async function loadProducts() {
       const { data } = await supabase.from('products').select('id,name,category,price,is_active,image_url,product_sizes(size,quantity)').order('created_at', { ascending: false });
       if (!mounted || !data?.length) return;
-      setItems(data.map((row) => ({ id: row.id, name: row.name, category: String(row.category).toLowerCase().includes('infantil') ? 'Infantil' : 'Adulto', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: (row.product_sizes || []).reduce((total: number, item: { quantity: number }) => total + item.quantity, 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: adminSizes.filter((option) => option.values.some((value) => (row.product_sizes || []).some((item: { size: number; quantity: number }) => item.size === value && item.quantity > 0))).map((option) => option.label), image: row.image_url || '/products/havaianas-branco.png' })));
+      setItems(data.map((row) => ({ id: row.id, name: row.name, category: String(row.category || 'Adulto'), price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: (row.product_sizes || []).reduce((total: number, item: { quantity: number }) => total + item.quantity, 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: adminSizes.filter((option) => option.values.some((value) => (row.product_sizes || []).some((item: { size: number; quantity: number }) => item.size === value && item.quantity > 0))).map((option) => option.label), image: row.image_url || '/products/havaianas-branco.png' })));
     }
+    loadCategories();
     loadProducts();
     return () => { mounted = false; };
   }, [session]);
   const visibleItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())), [items, search]);
   const summary = useMemo(() => {
-    const categories = Array.from(new Set(items.map((item) => item.category)));
     return {
       activeProducts: items.filter((item) => item.status === 'Ativo').length,
       stockTotal: items.reduce((total, item) => total + item.stock, 0),
       categoryCount: categories.length,
-      categoryLabel: categories.length ? categories.join(' e ').toLowerCase() : 'nenhuma cadastrada',
+      categoryLabel: categories.length ? categories.map((category) => category.name).join(' e ').toLowerCase() : 'nenhuma cadastrada',
       imageCount: items.filter((item) => item.image !== '/products/havaianas-branco.png').length,
     };
-  }, [items]);
+  }, [items, categories]);
   async function signIn(event: FormEvent) { event.preventDefault(); if (!supabase) return; setAuthLoading(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword(authForm); if (error) setAuthError('Não foi possível entrar. Confira seu e-mail e senha.'); setAuthLoading(false); }
   function handleImage(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; setImageFile(file); setForm((current) => ({ ...current, image: URL.createObjectURL(file) })); }
   function toggleSize(size: string) { setForm((current) => ({ ...current, sizes: current.sizes.includes(size) ? current.sizes.filter((item) => item !== size) : [...current.sizes, size] })); }
+  async function saveCategory(event: FormEvent) {
+    event.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    if (categories.some((category) => category.name.toLowerCase() === name.toLowerCase())) { setCategoryError('Essa categoria já está cadastrada.'); return; }
+    setCategorySaving(true);
+    setCategoryError('');
+    if (supabase && session) {
+      const { data, error } = await supabase.from('categories').insert({ name }).select('id,name').single();
+      if (error || !data) { setCategoryError(error?.code === '23505' ? 'Essa categoria já está cadastrada.' : 'Não foi possível salvar a categoria.'); setCategorySaving(false); return; }
+      setCategories((current) => [...current, data as AdminCategory].sort((a, b) => a.name.localeCompare(b.name)));
+    } else {
+      setCategories((current) => [...current, { id: String(Date.now()), name }].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+    setNewCategoryName('');
+    setForm((current) => ({ ...current, category: name }));
+    setCategorySaving(false);
+  }
   async function saveProduct() { if (!form.name.trim() || !form.price.trim()) return; if (supabase && session) { const numericPrice = Number(form.price.replace(/[^\d,.-]/g, '').replace(',', '.')) || 0; let imageUrl: string | null = form.image.startsWith('blob:') ? null : form.image; if (imageFile) { const path = `${crypto.randomUUID()}-${imageFile.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`; const upload = await supabase.storage.from('product-images').upload(path, imageFile, { contentType: imageFile.type, upsert: false }); if (upload.error) return; imageUrl = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl; } const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, price: numericPrice, description: form.description.trim(), image_url: imageUrl, is_active: true }).select('id').single(); if (inserted.error || !inserted.data) return; if (form.sizes.length) await supabase.from('product_sizes').insert(form.sizes.map((label) => ({ product_id: inserted.data.id, size: adminSizes.find((option) => option.label === label)?.values[0] ?? 0, quantity: 1 }))); setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: form.sizes.length, status: 'Ativo', sizes: form.sizes, image: imageUrl || '/products/havaianas-branco.png' }, ...current]); } else { setItems((current) => [...current, { id: String(Date.now()), name: form.name, category: form.category, price: `R$ ${form.price}`, stock: form.sizes.length, status: 'Rascunho', sizes: form.sizes, image: form.image }]); } setForm({ name: '', category: 'Adulto', price: '', description: '', sizes: [], image: '/products/havaianas-branco.png' }); setImageFile(null); setShowForm(false); }
 
   if (supabase && loading) return <main className="admin-auth-shell"><div className="admin-auth-card"><span className="admin-brand-mark">mv</span><h1>Carregando painel</h1><p>Preparando a conexão segura com a loja.</p></div></main>;
@@ -88,7 +115,13 @@ export default function AdminPage() {
         <div className="admin-toolbar"><div className="admin-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome do produto" /></div><button type="button" className="status-filter">Todos os status <ChevronDown size={15} /></button></div>
         <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Preço</th><th>Estoque total</th><th>Tamanhos com estoque</th><th>Status</th><th></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}><td><div className="table-product"><img src={item.image} alt="" /><strong>{item.name}</strong></div></td><td>{item.category}</td><td className="table-price">{item.price}</td><td><strong>{item.stock}</strong> pares</td><td><div className="table-sizes">{item.sizes.slice(0, 5).map((size) => <span key={size}>{size}</span>)}{item.sizes.length > 5 && <span>+{item.sizes.length - 5}</span>}</div></td><td><span className={item.status === 'Ativo' ? 'status active' : 'status draft'}><i />{item.status}</span></td><td><button className="row-menu" type="button" aria-label={`Opções de ${item.name}`}><MoreHorizontal size={18} /></button></td></tr>)}</tbody></table></div>
         <div className="admin-help-card"><div className="help-illustration"><ImagePlus size={27} /></div><div><span className="admin-kicker">próximo passo</span><h3>Cadastre os produtos da loja</h3><p>Use o botão de novo produto para adicionar fotos, categorias, preços e estoque separado por tamanho.</p></div><button type="button" className="secondary-admin-button" onClick={() => setShowForm(true)}>Cadastrar produto <Plus size={15} /></button></div>
+        <section id="categorias" style={{ marginTop: 34, borderTop: '1px solid #e4ece8', paddingTop: 4 }}>
+          <div className="admin-section-head"><div><span className="admin-kicker">organização</span><h2>Categorias</h2></div><span className="admin-breadcrumb">{categories.length} cadastradas</span></div>
+          <form onSubmit={saveCategory} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'end', gap: 12, marginTop: 4 }}><label style={{ display: 'grid', flex: '1 1 240px', gap: 7, color: '#72877d', fontSize: 10, fontWeight: 800 }}>Nova categoria<input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Ex.: Feminino, Masculino ou Infantil" style={{ width: '100%', border: '1px solid #dbe5e0', borderRadius: 8, outline: 0, background: '#fff', color: '#365548', padding: '11px 12px', fontSize: 12 }} /></label><button type="submit" className="new-product-button" disabled={categorySaving} style={{ minHeight: 38 }}>{categorySaving ? 'Salvando...' : 'Adicionar categoria'} <Plus size={16} /></button></form>
+          {categoryError && <small className="auth-error">{categoryError}</small>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginTop: 17 }}>{categories.map((category) => <span key={category.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #d8e8df', borderRadius: 999, background: '#f4faf7', color: '#47715d', padding: '8px 12px', fontSize: 11, fontWeight: 800 }}><Tags size={14} />{category.name}</span>)}</div>
+        </section>
       </div></section>
-    {showForm && <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowForm(false)}><div className="admin-form-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title" onClick={(event) => event.stopPropagation()}><div className="admin-form-header"><div><span className="admin-kicker">novo cadastro</span><h2 id="admin-form-title">Adicionar produto</h2></div><button type="button" onClick={() => setShowForm(false)} aria-label="Fechar"><X size={19} /></button></div><div className="admin-form-body"><label>Nome do produto<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Havaianas Brasil Logo Branco" /></label><div className="admin-form-grid"><label>Categoria<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}><option>Adulto</option><option>Infantil</option></select></label><label>Preço<input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="39,90" /></label></div><label>Descrição<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descreva o produto brevemente" rows={3} /></label><label className="upload-field"><span>Imagem principal</span><div><ImagePlus size={18} /><strong>Selecione uma foto do produto</strong><small>PNG ou JPG • imagem quadrada recomendada</small><input type="file" accept="image/png,image/jpeg" onChange={handleImage} /></div></label><fieldset><legend>Faixas disponíveis</legend><div className="admin-size-grid">{adminSizes.map((option) => <label key={option.label} className={form.sizes.includes(option.label) ? 'admin-size selected' : 'admin-size'}><input type="checkbox" checked={form.sizes.includes(option.label)} onChange={() => toggleSize(option.label)} /><span>{option.label}</span></label>)}</div></fieldset></div><div className="admin-form-footer"><button type="button" className="cancel-button" onClick={() => setShowForm(false)}>Cancelar</button><button type="button" className="new-product-button" onClick={saveProduct}>Salvar produto <Check size={16} /></button></div></div></div>}
+    {showForm && <div className="admin-modal-backdrop" role="presentation" onClick={() => setShowForm(false)}><div className="admin-form-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title" onClick={(event) => event.stopPropagation()}><div className="admin-form-header"><div><span className="admin-kicker">novo cadastro</span><h2 id="admin-form-title">Adicionar produto</h2></div><button type="button" onClick={() => setShowForm(false)} aria-label="Fechar"><X size={19} /></button></div><div className="admin-form-body"><label>Nome do produto<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Havaianas Brasil Logo Branco" /></label><div className="admin-form-grid"><label>Categoria<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select></label><label>Preço<input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="39,90" /></label></div><label>Descrição<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descreva o produto brevemente" rows={3} /></label><label className="upload-field"><span>Imagem principal</span><div><ImagePlus size={18} /><strong>Selecione uma foto do produto</strong><small>PNG ou JPG • imagem quadrada recomendada</small><input type="file" accept="image/png,image/jpeg" onChange={handleImage} /></div></label><fieldset><legend>Faixas disponíveis</legend><div className="admin-size-grid">{adminSizes.map((option) => <label key={option.label} className={form.sizes.includes(option.label) ? 'admin-size selected' : 'admin-size'}><input type="checkbox" checked={form.sizes.includes(option.label)} onChange={() => toggleSize(option.label)} /><span>{option.label}</span></label>)}</div></fieldset></div><div className="admin-form-footer"><button type="button" className="cancel-button" onClick={() => setShowForm(false)}>Cancelar</button><button type="button" className="new-product-button" onClick={saveProduct}>Salvar produto <Check size={16} /></button></div></div></div>}
   </main>;
 }
