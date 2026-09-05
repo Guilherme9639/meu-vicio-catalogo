@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 type SizeOption = { label: string; values: number[] };
 type AdminProduct = { id: string; name: string; category: string; color?: string; tag?: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; sizeQuantities?: Record<string, number>; description?: string; image: string };
 type AdminCategory = { id: string; name: string };
-type AdminOrder = { id: string; total: number; status: string; whatsappNumber: string | null; customerName: string | null; notes: string | null; createdAt: string; items: { productName: string; size: string; quantity: number }[] };
+type AdminOrder = { id: string; total: number; status: string; stockDeducted: boolean; whatsappNumber: string | null; customerName: string | null; notes: string | null; createdAt: string; items: { productName: string; size: string; quantity: number }[] };
 type AdminSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
 type AdminProfile = { fullName: string };
 type LoyaltyPurchase = { id: string; purchaseDate: string };
@@ -97,8 +97,8 @@ export default function AdminPage() {
     }
     async function loadOrders() {
       setOrdersLoading(true);
-      const { data } = await supabase.from('orders').select('id,total,status,whatsapp_number,customer_name,notes,created_at,order_items(product_name,selected_size,quantity)').order('created_at', { ascending: false });
-      if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, whatsappNumber: row.whatsapp_number, customerName: row.customer_name || null, notes: row.notes || null, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_name: string; selected_size: string; quantity: number }) => ({ productName: item.product_name, size: item.selected_size, quantity: item.quantity })) })));
+      const { data } = await supabase.from('orders').select('id,total,status,stock_deducted,whatsapp_number,customer_name,notes,created_at,order_items(product_name,selected_size,quantity)').order('created_at', { ascending: false });
+      if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, stockDeducted: Boolean(row.stock_deducted), whatsappNumber: row.whatsapp_number, customerName: row.customer_name || null, notes: row.notes || null, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_name: string; selected_size: string; quantity: number }) => ({ productName: item.product_name, size: item.selected_size, quantity: item.quantity })) })));
       if (mounted) setOrdersLoading(false);
     }
     async function loadLoyaltyCards() {
@@ -202,9 +202,31 @@ export default function AdminPage() {
   }
   async function updateOrderStatus(id: string, status: string) {
     if (!supabase || !session) return;
-    setOrders((current) => current.map((order) => order.id === id ? { ...order, status } : order));
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) setActionMessage('Não foi possível atualizar o status do pedido.');
+    const currentOrder = orders.find((order) => order.id === id);
+    const shouldDeductStock = status === 'Confirmado' && currentOrder?.status !== 'Confirmado' && !currentOrder?.stockDeducted;
+    if (shouldDeductStock) {
+      setActionMessage('Confirmando pedido e ajustando o estoque...');
+      const { data: orderItems, error: itemsError } = await supabase.from('order_items').select('product_id,selected_size,quantity').eq('order_id', id);
+      if (itemsError) { setActionMessage('Não foi possível carregar os itens do pedido.'); return; }
+      const { error: deductionError } = await supabase.rpc('confirm_order_and_deduct_stock', { p_order_id: id });
+      if (deductionError) {
+        const message = deductionError.message.includes('INSUFFICIENT_STOCK') ? 'Estoque insuficiente para confirmar este pedido.' : deductionError.message.includes('STOCK_NOT_REGISTERED') ? 'Um dos tamanhos do pedido não está cadastrado no estoque.' : 'Não foi possível confirmar o pedido e ajustar o estoque.';
+        setActionMessage(message);
+        return;
+      }
+      setItems((current) => current.map((product) => {
+        const productItems = (orderItems || []).filter((item: { product_id: string | null }) => item.product_id === product.id);
+        if (!productItems.length) return product;
+        const nextQuantities = { ...(product.sizeQuantities || {}) };
+        productItems.forEach((item: { selected_size: string; quantity: number }) => { nextQuantities[item.selected_size] = Math.max(0, (nextQuantities[item.selected_size] || 0) - Number(item.quantity)); });
+        return { ...product, sizeQuantities: nextQuantities, stock: Object.values(nextQuantities).reduce((total, quantity) => total + Number(quantity), 0), sizes: Object.keys(nextQuantities).filter((size) => Number(nextQuantities[size]) > 0) };
+      }));
+    } else {
+      const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+      if (error) { setActionMessage('Não foi possível atualizar o status do pedido.'); return; }
+    }
+    setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: order.stockDeducted || shouldDeductStock } : order));
+    setActionMessage(shouldDeductStock ? 'Pedido confirmado e estoque atualizado.' : 'Status do pedido atualizado.');
   }
   function exportOrders() {
     const escapeCell = (value: string | number | null) => `"${String(value ?? '').replace(/"/g, '""')}"`;
