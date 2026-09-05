@@ -399,6 +399,8 @@ a { color: inherit; text-decoration: none; }
 .export-orders-button { margin-left: auto; white-space: nowrap; }
 .order-note { display: block; margin-top: 4px; color: #98a7a1; font-size: 10px; font-weight: 500; line-height: 1.35; }
 .order-whatsapp-link { color: #4e8768; font-weight: 800; text-decoration: underline; text-decoration-color: #cfe2d6; text-underline-offset: 2px; }
+.stock-history-section { margin-top: 34px; border-top: 1px solid #e4ece8; padding-top: 4px; }
+.stock-history-intro { margin: -4px 0 15px; color: #789084; font-size: 11px; line-height: 1.45; }
 .admin-form-footer { display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid #e7ecea; padding: 15px 25px; }
 .cancel-button { border: 1px solid #dbe5e0; background: white; color: #71857c; }
 

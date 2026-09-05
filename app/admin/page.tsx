@@ -9,6 +9,7 @@ type SizeOption = { label: string; values: number[] };
 type AdminProduct = { id: string; name: string; category: string; color?: string; tag?: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; sizeQuantities?: Record<string, number>; description?: string; image: string };
 type AdminCategory = { id: string; name: string };
 type AdminOrder = { id: string; total: number; status: string; stockDeducted: boolean; whatsappNumber: string | null; customerName: string | null; notes: string | null; createdAt: string; items: { productName: string; size: string; quantity: number }[] };
+type StockMovement = { id: string; productName: string; size: string; previousQuantity: number; newQuantity: number; reason: string; createdAt: string };
 type AdminSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
 type AdminProfile = { fullName: string };
 type LoyaltyPurchase = { id: string; purchaseDate: string };
@@ -50,6 +51,8 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [stockHistoryLoading, setStockHistoryLoading] = useState(false);
   const [loyaltyCards, setLoyaltyCards] = useState<LoyaltyCard[]>([]);
   const [loyaltyLoading, setLoyaltyLoading] = useState(false);
   const [loyaltySaving, setLoyaltySaving] = useState(false);
@@ -101,6 +104,12 @@ export default function AdminPage() {
       if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, stockDeducted: Boolean(row.stock_deducted), whatsappNumber: row.whatsapp_number, customerName: row.customer_name || null, notes: row.notes || null, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_name: string; selected_size: string; quantity: number }) => ({ productName: item.product_name, size: item.selected_size, quantity: item.quantity })) })));
       if (mounted) setOrdersLoading(false);
     }
+    async function loadStockMovements() {
+      setStockHistoryLoading(true);
+      const { data } = await supabase.from('stock_movements').select('id,product_name,size_label,previous_quantity,new_quantity,reason,created_at').order('created_at', { ascending: false }).limit(30);
+      if (mounted && data) setStockMovements(data.map((row) => ({ id: row.id, productName: row.product_name, size: row.size_label, previousQuantity: Number(row.previous_quantity), newQuantity: Number(row.new_quantity), reason: row.reason, createdAt: row.created_at })));
+      if (mounted) setStockHistoryLoading(false);
+    }
     async function loadLoyaltyCards() {
       setLoyaltyLoading(true);
       const { data } = await supabase.from('loyalty_cards').select('id,customer_name,customer_phone,created_at,loyalty_purchases(id,purchase_date)').order('created_at', { ascending: false });
@@ -120,6 +129,7 @@ export default function AdminPage() {
     loadCategories();
     loadProducts();
     loadOrders();
+    loadStockMovements();
     loadLoyaltyCards();
     loadSettings();
     loadProfile();
@@ -145,6 +155,15 @@ export default function AdminPage() {
   function resetProductForm() { setEditingProductId(null); setImageFile(null); setForm({ name: '', category: categories[0]?.name || 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [], quantities: {}, image: '/products/havaianas-branco.png' }); }
   function openNewProduct() { setActionMessage(''); resetProductForm(); setShowForm(true); }
   function openEditProduct(item: AdminProduct) { setActionMessage(''); setEditingProductId(item.id); setImageFile(null); setForm({ name: item.name, category: item.category, color: item.color || '', tag: item.tag || '', price: item.price.replace('R$', '').trim(), description: item.description || '', isActive: item.status === 'Ativo', sizes: item.sizes, quantities: item.sizeQuantities || Object.fromEntries(item.sizes.map((size) => [size, 1])), image: item.image }); setShowForm(true); }
+  async function logStockChanges(productId: string, productName: string, previousQuantities: Record<string, number>, nextQuantities: Record<string, number>, reason: string) {
+    if (!supabase || !session || productId.startsWith('demo-')) return;
+    const labels = new Set([...Object.keys(previousQuantities), ...Object.keys(nextQuantities)]);
+    const changes = Array.from(labels).map((size) => ({ product_id: productId, product_name: productName, size_label: size, previous_quantity: Number(previousQuantities[size] || 0), new_quantity: Number(nextQuantities[size] || 0), reason, changed_by: session.user.id })).filter((change) => change.previous_quantity !== change.new_quantity);
+    if (!changes.length) return;
+    const { data, error } = await supabase.from('stock_movements').insert(changes).select('id,product_name,size_label,previous_quantity,new_quantity,reason,created_at');
+    if (error) { setActionMessage('Produto salvo, mas o histórico do estoque não foi registrado.'); return; }
+    if (data) setStockMovements((current) => [...data.map((row) => ({ id: row.id, productName: row.product_name, size: row.size_label, previousQuantity: Number(row.previous_quantity), newQuantity: Number(row.new_quantity), reason: row.reason, createdAt: row.created_at })), ...current].slice(0, 30));
+  }
   async function saveCategory(event: FormEvent) {
     event.preventDefault();
     const name = newCategoryName.trim();
@@ -165,6 +184,7 @@ export default function AdminPage() {
   }
   async function saveProduct() {
     if (!form.name.trim() || !form.price.trim()) { setActionMessage('Preencha o nome e o preço do produto.'); return; }
+    const previousItem = editingProductId ? items.find((item) => item.id === editingProductId) : undefined;
     const numericPrice = parsePrice(form.price);
     let imageUrl: string | null = form.image.startsWith('blob:') ? null : form.image;
     if (imageFile && supabase && session) {
@@ -184,12 +204,14 @@ export default function AdminPage() {
       const removeResult = selectedValues.length ? await supabase.from('product_sizes').delete().eq('product_id', editingProductId).not('size', 'in', `(${selectedValues.join(',')})`) : await supabase.from('product_sizes').delete().eq('product_id', editingProductId);
       if (removeResult.error) { setActionMessage('Produto atualizado, mas alguns tamanhos antigos permaneceram.'); return; }
       const nextItem = { id: editingProductId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png' };
+      await logStockChanges(editingProductId, form.name.trim(), previousItem?.sizeQuantities || {}, nextItem.sizeQuantities, 'Ajuste manual');
       setItems((current) => current.map((item) => item.id === editingProductId ? nextItem : item));
     } else if (supabase && session) {
       const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageUrl, is_active: form.isActive }).select('id').single();
       if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
       const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
       if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
+      await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
       setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png' }, ...current]);
     } else {
       const localId = editingProductId || String(Date.now());
@@ -362,6 +384,11 @@ export default function AdminPage() {
           <div className="admin-section-head"><div><span className="admin-kicker">acompanhamento</span><h2>Pedidos enviados</h2></div><span className="admin-breadcrumb">{orders.length} registrados</span></div>
           <div className="admin-toolbar order-toolbar"><div className="admin-search"><Search size={17} /><input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder="Buscar por pedido, nome, WhatsApp ou produto" /></div><button type="button" className="secondary-admin-button export-orders-button" onClick={exportOrders} disabled={!visibleOrders.length}>Exportar Excel (CSV) <Upload size={15} /></button></div>
           <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Itens escolhidos</th><th>WhatsApp</th><th>Total</th><th>Data</th><th>Status</th></tr></thead><tbody>{ordersLoading ? <tr><td colSpan={7}>Carregando pedidos...</td></tr> : visibleOrders.length ? visibleOrders.map((order) => <tr key={order.id}><td><strong>#{order.id.slice(0, 8).toUpperCase()}</strong></td><td><strong>{order.customerName || 'Não informado'}</strong>{order.notes && <small className="order-note">{order.notes}</small>}</td><td>{order.items.map((item) => `${item.productName} • ${item.size} • ${item.quantity}x`).join(' | ')}</td><td>{order.whatsappNumber ? <a className="order-whatsapp-link" href={`https://wa.me/${order.whatsappNumber}`} target="_blank" rel="noreferrer">{order.whatsappNumber}</a> : 'Não informado'}</td><td className="table-price">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td>{new Date(order.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td><td><select className="order-status-select" value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value)} aria-label={`Status do pedido ${order.id.slice(0, 8)}`}><option>Novo</option><option>Em contato</option><option>Confirmado</option><option>Concluído</option><option>Cancelado</option></select></td></tr>) : <tr><td colSpan={7}>{orders.length ? 'Nenhum pedido corresponde à busca.' : 'Ainda não há pedidos registrados. Eles aparecerão aqui quando alguém enviar uma sacola pelo WhatsApp.'}</td></tr>}</tbody></table></div>
+        </section>
+        <section className="stock-history-section" id="historico-estoque">
+          <div className="admin-section-head"><div><span className="admin-kicker">controle</span><h2>Histórico do estoque</h2></div><span className="admin-breadcrumb">últimas 30 alterações</span></div>
+          <p className="stock-history-intro">Veja quando um tamanho foi alterado, qual era a quantidade anterior e quem realizou o ajuste.</p>
+          <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Tamanho</th><th>Antes</th><th>Depois</th><th>Motivo</th><th>Data</th></tr></thead><tbody>{stockHistoryLoading ? <tr><td colSpan={6}>Carregando histórico...</td></tr> : stockMovements.length ? stockMovements.map((movement) => <tr key={movement.id}><td><strong>{movement.productName}</strong></td><td>{movement.size}</td><td>{movement.previousQuantity} pares</td><td><strong>{movement.newQuantity} pares</strong></td><td>{movement.reason}</td><td>{new Date(movement.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td></tr>) : <tr><td colSpan={6}>As alterações de estoque aparecerão aqui após novos cadastros, edições ou confirmações de pedidos.</td></tr>}</tbody></table></div>
         </section>
         <section id="fidelidade" className="admin-loyalty-section">
           <div className="admin-section-head"><div><span className="admin-kicker">relacionamento</span><h2>Cartão fidelidade</h2></div><span className="admin-breadcrumb">{loyaltyCards.length} clientes</span></div>
