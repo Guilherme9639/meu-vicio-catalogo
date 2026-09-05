@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bell, Check, ChevronDown, Eye, EyeOff, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Plus, Search, Settings2, ShoppingBag, Tags, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Plus, Search, Settings2, ShoppingBag, Tags, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -11,6 +11,8 @@ type AdminCategory = { id: string; name: string };
 type AdminOrder = { id: string; total: number; status: string; whatsappNumber: string | null; createdAt: string; items: { productName: string; size: string; quantity: number }[] };
 type AdminSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
 type AdminProfile = { fullName: string };
+type LoyaltyPurchase = { id: string; purchaseDate: string };
+type LoyaltyCard = { id: string; customerName: string; customerPhone: string; purchases: LoyaltyPurchase[] };
 const defaultSettings: AdminSettings = { storeName: 'Meu Vício', hours: 'Segunda a sábado • 9h às 18h', whatsappPrimary: '5531994483976', whatsappSecondary: '5531999999999', whatsappSecondaryLabel: 'Número de demonstração', whatsappMessage: 'Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido.' };
 const initialProducts: AdminProduct[] = [
   { id: 'demo-1', name: 'Brasil Logo Branco', category: 'Adulto', price: 'R$ 39,90', stock: 17, status: 'Ativo', sizes: ['33/34', '35/36', '37/38', '39/40'], image: '/products/havaianas-branco.png' },
@@ -48,6 +50,11 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
+  const [loyaltyCards, setLoyaltyCards] = useState<LoyaltyCard[]>([]);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+  const [loyaltySaving, setLoyaltySaving] = useState(false);
+  const [loyaltyForm, setLoyaltyForm] = useState({ customerName: '', customerPhone: '' });
+  const [purchaseDates, setPurchaseDates] = useState<Record<string, string>>({});
   const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Ativo' | 'Rascunho'>('Todos');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -94,6 +101,12 @@ export default function AdminPage() {
       if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, whatsappNumber: row.whatsapp_number, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_name: string; selected_size: string; quantity: number }) => ({ productName: item.product_name, size: item.selected_size, quantity: item.quantity })) })));
       if (mounted) setOrdersLoading(false);
     }
+    async function loadLoyaltyCards() {
+      setLoyaltyLoading(true);
+      const { data } = await supabase.from('loyalty_cards').select('id,customer_name,customer_phone,created_at,loyalty_purchases(id,purchase_date)').order('created_at', { ascending: false });
+      if (mounted && data) setLoyaltyCards(data.map((row) => ({ id: row.id, customerName: row.customer_name, customerPhone: row.customer_phone || '', purchases: (row.loyalty_purchases || []).map((purchase: { id: string; purchase_date: string }) => ({ id: purchase.id, purchaseDate: purchase.purchase_date })).sort((a: LoyaltyPurchase, b: LoyaltyPurchase) => a.purchaseDate.localeCompare(b.purchaseDate)) })));
+      if (mounted) setLoyaltyLoading(false);
+    }
     async function loadSettings() {
       const { data } = await supabase.from('store_settings').select('store_name,hours,whatsapp_primary,whatsapp_secondary,whatsapp_secondary_label,whatsapp_message').eq('id', 'default').maybeSingle();
       if (mounted && data) setSettings({ storeName: data.store_name, hours: data.hours, whatsappPrimary: data.whatsapp_primary, whatsappSecondary: data.whatsapp_secondary, whatsappSecondaryLabel: data.whatsapp_secondary_label, whatsappMessage: data.whatsapp_message });
@@ -107,6 +120,7 @@ export default function AdminPage() {
     loadCategories();
     loadProducts();
     loadOrders();
+    loadLoyaltyCards();
     loadSettings();
     loadProfile();
     return () => { mounted = false; };
@@ -210,6 +224,30 @@ export default function AdminPage() {
     else setActionMessage('Preferências atualizadas com sucesso.');
     setSettingsSaving(false);
   }
+  async function addLoyaltyCard(event: FormEvent) {
+    event.preventDefault();
+    const customerName = loyaltyForm.customerName.trim();
+    if (!customerName) { setActionMessage('Informe o nome do cliente para criar a cartela.'); return; }
+    if (!supabase || !session) return;
+    setLoyaltySaving(true);
+    const { data, error } = await supabase.from('loyalty_cards').insert({ customer_name: customerName, customer_phone: loyaltyForm.customerPhone.replace(/\D/g, '') }).select('id,customer_name,customer_phone').single();
+    if (error || !data) { setActionMessage('Não foi possível cadastrar a cartela de fidelidade.'); setLoyaltySaving(false); return; }
+    setLoyaltyCards((current) => [{ id: data.id, customerName: data.customer_name, customerPhone: data.customer_phone || '', purchases: [] }, ...current]);
+    setLoyaltyForm({ customerName: '', customerPhone: '' });
+    setActionMessage('Cartela cadastrada com sucesso.');
+    setLoyaltySaving(false);
+  }
+  async function markLoyaltyPurchase(card: LoyaltyCard) {
+    if (!supabase || !session) return;
+    if (card.purchases.length >= 10) { setActionMessage('Essa cartela já está completa. Crie uma nova cartela para começar outro ciclo.'); return; }
+    const purchaseDate = purchaseDates[card.id] || new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase.from('loyalty_purchases').insert({ loyalty_card_id: card.id, purchase_date: purchaseDate }).select('id,purchase_date').single();
+    if (error || !data) { setActionMessage('Não foi possível registrar essa compra.'); return; }
+    const purchase = { id: data.id, purchaseDate: data.purchase_date };
+    setLoyaltyCards((current) => current.map((item) => item.id === card.id ? { ...item, purchases: [...item.purchases, purchase] } : item));
+    setPurchaseDates((current) => ({ ...current, [card.id]: '' }));
+    setActionMessage(`${card.customerName}: compra ${card.purchases.length + 1} de 10 registrada.`);
+  }
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
     if (!supabase || !session) return;
@@ -237,8 +275,8 @@ export default function AdminPage() {
   if (supabase && !session) return <main className="admin-auth-shell"><form className="admin-auth-card" onSubmit={signIn}><span className="admin-brand-mark">mv</span><span className="admin-kicker">acesso restrito</span><h1>Painel da loja</h1><p>Entre com o usuário administrador do Supabase para gerenciar produtos e estoque.</p><label>E-mail<input type="email" required value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} placeholder="seu@email.com" /></label><label>Senha<input type="password" required value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} placeholder="Sua senha" /></label>{authError && <small className="auth-error">{authError}</small>}<button type="submit" className="new-product-button" disabled={authLoading}>{authLoading ? 'Entrando...' : 'Entrar no painel'}</button><a href="/" className="auth-back-link">Voltar ao catálogo</a></form></main>;
 
   return <main className="admin-shell">
-    <aside className="admin-sidebar"><a href="/" className="admin-brand"><span className="admin-brand-mark">mv</span><span><strong>MEU VÍCIO</strong><small>painel da loja</small></span></a><div className="admin-menu-label">menu principal</div><nav className="admin-menu"><a className="active" href="#visao-geral"><LayoutDashboard size={17} /> Visão geral</a><a href="#produtos"><Package size={17} /> Produtos <span>{items.length}</span></a><a href="#categorias"><Tags size={17} /> Categorias</a><a href="#pedidos"><ShoppingBag size={17} /> Pedidos <span>{orders.length}</span></a></nav><div className="admin-menu-label settings-label">configurações</div><nav className="admin-menu"><a href="#configuracoes"><Settings2 size={17} /> Preferências</a><a href="#perfil"><Settings2 size={17} /> Perfil</a></nav><div className="admin-sidebar-bottom"><div className="admin-user-avatar">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>Administrador</span></div><button type="button" onClick={signOut} aria-label="Sair do painel" title="Sair do painel" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', border: 0, background: 'transparent', color: '#7d9288', cursor: 'pointer', padding: '6px 3px', font: 'inherit' }}><LogOut size={16} /><span style={{ marginTop: 0, color: 'currentColor', fontSize: 10, fontWeight: 800 }}>Sair</span></button></div></aside>
-    <section className="admin-content"><header className="admin-topbar"><div><span className="admin-breadcrumb">Painel / Visão geral</span><h1>{greeting}, {displayName} <span>✦</span></h1></div><div className="admin-top-actions"><button type="button" aria-label="Notificações indisponíveis" title="Notificações em breve" disabled><Bell size={19} /></button><a className="view-store" href="/" target="_blank" rel="noreferrer">Ver catálogo <ArrowLeft size={15} /></a></div></header><nav className="admin-mobile-nav" aria-label="Seções do painel"><a href="#visao-geral">Visão geral</a><a href="#produtos">Produtos</a><a href="#categorias">Categorias</a><a href="#pedidos">Pedidos</a><a href="#configuracoes">Preferências</a></nav>
+<aside className="admin-sidebar"><a href="/" className="admin-brand"><span className="admin-brand-mark">mv</span><span><strong>MEU VÍCIO</strong><small>painel da loja</small></span></a><div className="admin-menu-label">menu principal</div><nav className="admin-menu"><a className="active" href="#visao-geral"><LayoutDashboard size={17} /> Visão geral</a><a href="#produtos"><Package size={17} /> Produtos <span>{items.length}</span></a><a href="#categorias"><Tags size={17} /> Categorias</a><a href="#pedidos"><ShoppingBag size={17} /> Pedidos <span>{orders.length}</span></a><a href="#fidelidade"><Heart size={17} /> Fidelidade</a></nav><div className="admin-menu-label settings-label">configurações</div><nav className="admin-menu"><a href="#configuracoes"><Settings2 size={17} /> Preferências</a><a href="#perfil"><Settings2 size={17} /> Perfil</a></nav><div className="admin-sidebar-bottom"><div className="admin-user-avatar">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>Administrador</span></div><button type="button" onClick={signOut} aria-label="Sair do painel" title="Sair do painel" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', border: 0, background: 'transparent', color: '#7d9288', cursor: 'pointer', padding: '6px 3px', font: 'inherit' }}><LogOut size={16} /><span style={{ marginTop: 0, color: 'currentColor', fontSize: 10, fontWeight: 800 }}>Sair</span></button></div></aside>
+<section className="admin-content"><header className="admin-topbar"><div><span className="admin-breadcrumb">Painel / Visão geral</span><h1>{greeting}, {displayName} <span>✦</span></h1></div><div className="admin-top-actions"><button type="button" aria-label="Notificações indisponíveis" title="Notificações em breve" disabled><Bell size={19} /></button><a className="view-store" href="/" target="_blank" rel="noreferrer">Ver catálogo <ArrowLeft size={15} /></a></div></header><nav className="admin-mobile-nav" aria-label="Seções do painel"><a href="#visao-geral">Visão geral</a><a href="#produtos">Produtos</a><a href="#categorias">Categorias</a><a href="#fidelidade">Fidelidade</a><a href="#pedidos">Pedidos</a><a href="#configuracoes">Preferências</a></nav>
       <div className="admin-main" id="visao-geral">{actionMessage && <div className="admin-action-message" role="status"><Check size={16} /> <span>{actionMessage}</span><button type="button" onClick={() => setActionMessage('')} aria-label="Fechar mensagem"><X size={16} /></button></div>}{importNotice && <div className="import-notice"><div><span className="notice-icon"><Check size={16} /></span><div><strong>Drive usado somente para a primeira carga</strong><p>Depois da importação, novos produtos, fotos e estoques serão atualizados diretamente neste painel.</p></div></div><button type="button" onClick={() => setImportNotice(false)} aria-label="Fechar aviso"><X size={17} /></button></div>}
         <div className="admin-stats"><div className="stat-card accent"><span className="stat-icon"><Package size={18} /></span><div><small>Produtos ativos</small><strong>{summary.activeProducts.toString().padStart(2, '0')}</strong><em>{items.length} cadastrados no total</em></div></div><div className="stat-card"><span className="stat-icon green"><ShoppingBag size={18} /></span><div><small>Pares em estoque</small><strong>{summary.stockTotal}</strong><em>somatório das quantidades</em></div></div><div className="stat-card"><span className="stat-icon sand"><Tags size={18} /></span><div><small>Categorias</small><strong>{summary.categoryCount.toString().padStart(2, '0')}</strong><em>{summary.categoryLabel}</em></div></div><div className="stat-card"><span className="stat-icon lilac"><ImagePlus size={18} /></span><div><small>Imagens cadastradas</small><strong>{summary.imageCount.toString().padStart(2, '0')}</strong><em>imagens vinculadas</em></div></div></div>
         <div className="admin-section-head" id="produtos"><div><span className="admin-kicker">catálogo</span><h2>Produtos cadastrados</h2></div><div className="admin-head-actions"><button type="button" className="import-button" onClick={() => setImportNotice(true)}><Upload size={16} /> Orientações da carga</button><button type="button" className="new-product-button" onClick={openNewProduct}><Plus size={17} /> Novo produto</button></div></div>
@@ -255,6 +293,12 @@ export default function AdminPage() {
           <div className="admin-section-head"><div><span className="admin-kicker">acompanhamento</span><h2>Pedidos enviados</h2></div><span className="admin-breadcrumb">{orders.length} registrados</span></div>
           <div className="admin-toolbar order-toolbar"><div className="admin-search"><Search size={17} /><input value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} placeholder="Buscar por pedido, WhatsApp ou produto" /></div></div>
           <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Pedido</th><th>Itens escolhidos</th><th>WhatsApp</th><th>Total</th><th>Data</th><th>Status</th></tr></thead><tbody>{ordersLoading ? <tr><td colSpan={6}>Carregando pedidos...</td></tr> : visibleOrders.length ? visibleOrders.map((order) => <tr key={order.id}><td><strong>#{order.id.slice(0, 8).toUpperCase()}</strong></td><td>{order.items.map((item) => `${item.productName} • ${item.size} • ${item.quantity}x`).join(' | ')}</td><td>{order.whatsappNumber ? <a className="order-whatsapp-link" href={`https://wa.me/${order.whatsappNumber}`} target="_blank" rel="noreferrer">{order.whatsappNumber}</a> : 'Não informado'}</td><td className="table-price">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td>{new Date(order.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td><td><select className="order-status-select" value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value)} aria-label={`Status do pedido ${order.id.slice(0, 8)}`}><option>Novo</option><option>Em contato</option><option>Confirmado</option><option>Concluído</option><option>Cancelado</option></select></td></tr>) : <tr><td colSpan={6}>{orders.length ? 'Nenhum pedido corresponde à busca.' : 'Ainda não há pedidos registrados. Eles aparecerão aqui quando alguém enviar uma sacola pelo WhatsApp.'}</td></tr>}</tbody></table></div>
+        </section>
+        <section id="fidelidade" className="admin-loyalty-section">
+          <div className="admin-section-head"><div><span className="admin-kicker">relacionamento</span><h2>Cartão fidelidade</h2></div><span className="admin-breadcrumb">{loyaltyCards.length} clientes</span></div>
+          <p className="admin-loyalty-intro">Cadastre o cliente e registre cada compra manualmente. Ao completar 10 marcações, a cartela fica pronta para liberar o benefício.</p>
+          <form className="admin-loyalty-form" onSubmit={addLoyaltyCard}><label><span>Nome do cliente</span><input value={loyaltyForm.customerName} onChange={(event) => setLoyaltyForm({ ...loyaltyForm, customerName: event.target.value })} placeholder="Ex.: Maria Silva" /></label><label><span>Telefone / WhatsApp</span><input value={loyaltyForm.customerPhone} onChange={(event) => setLoyaltyForm({ ...loyaltyForm, customerPhone: event.target.value })} placeholder="(31) 99999-9999" inputMode="tel" /></label><button type="submit" className="new-product-button" disabled={loyaltySaving}>{loyaltySaving ? 'Salvando...' : 'Criar cartela'} <Plus size={16} /></button></form>
+          {loyaltyLoading ? <div className="admin-loyalty-empty">Carregando clientes cadastrados...</div> : loyaltyCards.length ? <div className="loyalty-card-grid">{loyaltyCards.map((card) => { const completed = card.purchases.length; return <article className="loyalty-card" key={card.id}><div className="loyalty-card-head"><div><span className="admin-kicker">cliente</span><h3>{card.customerName}</h3><p>{card.customerPhone || 'Telefone não informado'}</p></div><strong>{completed}<small>/10</small></strong></div><div className="loyalty-stamps" aria-label={'Cartela de ' + card.customerName}>{Array.from({ length: 10 }, (_, index) => { const purchase = card.purchases[index]; return <span className={purchase ? 'loyalty-stamp filled' : 'loyalty-stamp'} key={purchase?.id || index}>{purchase ? <><Check size={13} /><small>{new Date(purchase.purchaseDate + 'T12:00:00').toLocaleDateString('pt-BR')}</small></> : index + 1}</span>; })}</div><div className="loyalty-card-actions"><input type="date" value={purchaseDates[card.id] || ''} onChange={(event) => setPurchaseDates((current) => ({ ...current, [card.id]: event.target.value }))} aria-label={'Data da próxima compra de ' + card.customerName} disabled={completed >= 10} /><button type="button" className="secondary-admin-button" onClick={() => markLoyaltyPurchase(card)} disabled={completed >= 10}>{completed >= 10 ? 'Cartela completa' : 'Marcar compra'} <Check size={15} /></button></div>{completed >= 10 && <small className="loyalty-complete-note">Benefício liberado • crie uma nova cartela para o próximo ciclo.</small>}</article>; })}</div> : <div className="admin-loyalty-empty"><Heart size={24} /><strong>Nenhuma cartela cadastrada</strong><p>Comece adicionando o primeiro cliente acima.</p></div>}
         </section>
         <section id="configuracoes" className="admin-settings-section">
           <div className="admin-profile-block" id="perfil">
