@@ -82,7 +82,7 @@ export default function Home() {
   const visibleSizeOptions = useMemo(() => category === 'Adulto' ? adultSizeOptions : category === 'Infantil' ? infantSizeOptions : sizeOptions, [category]);
   const catalogCategories = useMemo(() => {
     const available = new Set(catalogProducts.map((product) => product.category));
-    return ['Adulto', 'Infantil'].filter((name) => available.has(name)).concat(Array.from(available).filter((name) => name !== 'Adulto' && name !== 'Infantil').sort());
+    return ['Adulto', 'Infantil'].concat(Array.from(available).filter((name) => name !== 'Adulto' && name !== 'Infantil').sort());
   }, [catalogProducts]);
   useEffect(() => {
     let mounted = true;
