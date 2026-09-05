@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Plus, Search, Settings2, ShoppingBag, Tags, Upload, X } from 'lucide-react';
+import { ArrowLeft, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -237,6 +237,28 @@ export default function AdminPage() {
     setActionMessage('Cartela cadastrada com sucesso.');
     setLoyaltySaving(false);
   }
+  async function startLoyaltyEdit(card: LoyaltyCard) {
+    if (!supabase || !session) return;
+    const customerName = window.prompt('Nome do cliente', card.customerName);
+    if (customerName === null) return;
+    const trimmedName = customerName.trim();
+    if (!trimmedName) { setActionMessage('Informe o nome do cliente.'); return; }
+    const customerPhone = window.prompt('Telefone / WhatsApp', card.customerPhone);
+    if (customerPhone === null) return;
+    const normalizedPhone = customerPhone.replace(/\D/g, '');
+    const { error } = await supabase.from('loyalty_cards').update({ customer_name: trimmedName, customer_phone: normalizedPhone }).eq('id', card.id);
+    if (error) { setActionMessage('Não foi possível atualizar a cartela.'); return; }
+    setLoyaltyCards((current) => current.map((item) => item.id === card.id ? { ...item, customerName: trimmedName, customerPhone: normalizedPhone } : item));
+    setActionMessage('Cartela atualizada com sucesso.');
+  }
+  async function deleteLoyaltyCard(card: LoyaltyCard) {
+    if (!supabase || !session) return;
+    if (!window.confirm('Excluir a cartela de ' + card.customerName + '? As marcações e datas também serão removidas.')) return;
+    const { error } = await supabase.from('loyalty_cards').delete().eq('id', card.id);
+    if (error) { setActionMessage('Não foi possível excluir a cartela.'); return; }
+    setLoyaltyCards((current) => current.filter((item) => item.id !== card.id));
+    setActionMessage('Cartela excluída com sucesso.');
+  }
   async function markLoyaltyPurchase(card: LoyaltyCard) {
     if (!supabase || !session) return;
     if (card.purchases.length >= 10) { setActionMessage('Essa cartela já está completa. Crie uma nova cartela para começar outro ciclo.'); return; }
@@ -299,6 +321,10 @@ export default function AdminPage() {
           <p className="admin-loyalty-intro">Cadastre o cliente e registre cada compra manualmente. Ao completar 10 marcações, a cartela fica pronta para liberar o benefício.</p>
           <form className="admin-loyalty-form" onSubmit={addLoyaltyCard}><label><span>Nome do cliente</span><input value={loyaltyForm.customerName} onChange={(event) => setLoyaltyForm({ ...loyaltyForm, customerName: event.target.value })} placeholder="Ex.: Maria Silva" /></label><label><span>Telefone / WhatsApp</span><input value={loyaltyForm.customerPhone} onChange={(event) => setLoyaltyForm({ ...loyaltyForm, customerPhone: event.target.value })} placeholder="(31) 99999-9999" inputMode="tel" /></label><button type="submit" className="new-product-button" disabled={loyaltySaving}>{loyaltySaving ? 'Salvando...' : 'Criar cartela'} <Plus size={16} /></button></form>
           {loyaltyLoading ? <div className="admin-loyalty-empty">Carregando clientes cadastrados...</div> : loyaltyCards.length ? <div className="loyalty-card-grid">{loyaltyCards.map((card) => { const completed = card.purchases.length; return <article className="loyalty-card" key={card.id}><div className="loyalty-card-head"><div><span className="admin-kicker">cliente</span><h3>{card.customerName}</h3><p>{card.customerPhone || 'Telefone não informado'}</p></div><strong>{completed}<small>/10</small></strong></div><div className="loyalty-stamps" aria-label={'Cartela de ' + card.customerName}>{Array.from({ length: 10 }, (_, index) => { const purchase = card.purchases[index]; return <span className={purchase ? 'loyalty-stamp filled' : 'loyalty-stamp'} key={purchase?.id || index}>{purchase ? <><Check size={13} /><small>{new Date(purchase.purchaseDate + 'T12:00:00').toLocaleDateString('pt-BR')}</small></> : index + 1}</span>; })}</div><div className="loyalty-card-actions"><input type="date" value={purchaseDates[card.id] || ''} onChange={(event) => setPurchaseDates((current) => ({ ...current, [card.id]: event.target.value }))} aria-label={'Data da próxima compra de ' + card.customerName} disabled={completed >= 10} /><button type="button" className="secondary-admin-button" onClick={() => markLoyaltyPurchase(card)} disabled={completed >= 10}>{completed >= 10 ? 'Cartela completa' : 'Marcar compra'} <Check size={15} /></button></div>{completed >= 10 && <small className="loyalty-complete-note">Benefício liberado • crie uma nova cartela para o próximo ciclo.</small>}</article>; })}</div> : <div className="admin-loyalty-empty"><Heart size={24} /><strong>Nenhuma cartela cadastrada</strong><p>Comece adicionando o primeiro cliente acima.</p></div>}
+        </section>
+        <section className="loyalty-management-section">
+          <div className="admin-section-head"><div><span className="admin-kicker">manutenção</span><h2>Gerenciar cartelas</h2></div><span className="admin-breadcrumb">editar ou excluir</span></div>
+          {loyaltyCards.length ? <div className="loyalty-management-list">{loyaltyCards.map((card) => <div className="loyalty-management-row" key={card.id}><div><strong>{card.customerName}</strong><span>{card.customerPhone || 'Telefone não informado'} • {card.purchases.length}/10 compras</span></div><div className="loyalty-management-actions"><button type="button" onClick={() => startLoyaltyEdit(card)}><Pencil size={14} /> Editar</button><button type="button" className="loyalty-delete-button" onClick={() => deleteLoyaltyCard(card)}><Trash2 size={14} /> Excluir</button></div></div>)}</div> : <p className="admin-loyalty-management-empty">As ações de edição e exclusão aparecerão aqui depois que uma cartela for cadastrada.</p>}
         </section>
         <section id="configuracoes" className="admin-settings-section">
           <div className="admin-profile-block" id="perfil">
