@@ -261,6 +261,38 @@ export default function AdminPage() {
     URL.revokeObjectURL(link.href);
     setActionMessage(`${visibleOrders.length} pedido(s) exportado(s) para Excel.`);
   }
+  function exportCatalogBackup() {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      store: settings,
+      categories,
+      products: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        color: item.color || null,
+        tag: item.tag || null,
+        price: item.price,
+        stock: item.stock,
+        status: item.status,
+        sizes: item.sizes,
+        sizeQuantities: item.sizeQuantities || {},
+        description: item.description || '',
+        image: item.image,
+      })),
+      orders,
+      loyaltyCards,
+      stockMovements,
+    };
+    const filename = `backup-meu-vicio-${new Date().toISOString().slice(0, 10)}.json`;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    setActionMessage('Backup do catálogo baixado com sucesso.');
+  }
   async function toggleProductStatus(item: AdminProduct) {
     const nextStatus = item.status === 'Ativo' ? 'Rascunho' : 'Ativo';
     if (supabase && session && !item.id.startsWith('demo-')) {
@@ -386,7 +418,7 @@ export default function AdminPage() {
           <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Itens escolhidos</th><th>WhatsApp</th><th>Total</th><th>Data</th><th>Status</th></tr></thead><tbody>{ordersLoading ? <tr><td colSpan={7}>Carregando pedidos...</td></tr> : visibleOrders.length ? visibleOrders.map((order) => <tr key={order.id}><td><strong>#{order.id.slice(0, 8).toUpperCase()}</strong></td><td><strong>{order.customerName || 'Não informado'}</strong>{order.notes && <small className="order-note">{order.notes}</small>}</td><td>{order.items.map((item) => `${item.productName} • ${item.size} • ${item.quantity}x`).join(' | ')}</td><td>{order.whatsappNumber ? <a className="order-whatsapp-link" href={`https://wa.me/${order.whatsappNumber}`} target="_blank" rel="noreferrer">{order.whatsappNumber}</a> : 'Não informado'}</td><td className="table-price">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td>{new Date(order.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td><td><select className="order-status-select" value={order.status} onChange={(event) => updateOrderStatus(order.id, event.target.value)} aria-label={`Status do pedido ${order.id.slice(0, 8)}`}><option>Novo</option><option>Em contato</option><option>Confirmado</option><option>Concluído</option><option>Cancelado</option></select></td></tr>) : <tr><td colSpan={7}>{orders.length ? 'Nenhum pedido corresponde à busca.' : 'Ainda não há pedidos registrados. Eles aparecerão aqui quando alguém enviar uma sacola pelo WhatsApp.'}</td></tr>}</tbody></table></div>
         </section>
         <section className="stock-history-section" id="historico-estoque">
-          <div className="admin-section-head"><div><span className="admin-kicker">controle</span><h2>Histórico do estoque</h2></div><span className="admin-breadcrumb">últimas 30 alterações</span></div>
+          <div className="admin-section-head"><div><span className="admin-kicker">controle</span><h2>Histórico do estoque</h2></div><div className="admin-head-actions"><button type="button" className="secondary-admin-button" onClick={exportCatalogBackup}><Upload size={15} /> Baixar backup</button><span className="admin-breadcrumb">últimas 30 alterações</span></div></div>
           <p className="stock-history-intro">Veja quando um tamanho foi alterado, qual era a quantidade anterior e quem realizou o ajuste.</p>
           <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Tamanho</th><th>Antes</th><th>Depois</th><th>Motivo</th><th>Data</th></tr></thead><tbody>{stockHistoryLoading ? <tr><td colSpan={6}>Carregando histórico...</td></tr> : stockMovements.length ? stockMovements.map((movement) => <tr key={movement.id}><td><strong>{movement.productName}</strong></td><td>{movement.size}</td><td>{movement.previousQuantity} pares</td><td><strong>{movement.newQuantity} pares</strong></td><td>{movement.reason}</td><td>{new Date(movement.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td></tr>) : <tr><td colSpan={6}>As alterações de estoque aparecerão aqui após novos cadastros, edições ou confirmações de pedidos.</td></tr>}</tbody></table></div>
         </section>
