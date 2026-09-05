@@ -47,7 +47,7 @@ a { color: inherit; text-decoration: none; }
 @keyframes hero-slide-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 .hero-carousel-progress { height: 2px; margin-top: 31px; overflow: hidden; background: rgba(180, 102, 84, .16); }
 .hero-carousel-progress span { display: block; height: 100%; background: #b46654; transition: width .35s ease; }
-.hero-carousel-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 14px; }
+.hero-carousel-tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-top: 14px; }
 .hero-carousel-tab { display: inline-flex; align-items: center; gap: 7px; border: 0; border-top: 1px solid rgba(180, 102, 84, .2); border-radius: 0; background: transparent; color: #8b7164; cursor: pointer; padding: 10px 7px 4px 0; font-size: 10px; font-weight: 800; text-align: left; transition: color .2s ease, border-color .2s ease; }
 .hero-carousel-tab span { color: #ba715e; font-size: 9px; letter-spacing: .08em; }
 .hero-carousel-tab:hover, .hero-carousel-tab.active { border-color: #b46654; color: #2e251f; }
