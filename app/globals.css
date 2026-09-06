@@ -555,6 +555,11 @@ a { color: inherit; text-decoration: none; }
 .loyalty-card, .admin-settings-card { border-color: #e4e4e4; background: #fff; }
 .loyalty-card-head h3, .loyalty-management-row strong { color: #3a3a3a; }
 .loyalty-card-head > strong { color: #c8101e; }
+.loyalty-card-manage-actions { display: flex; gap: 7px; margin-top: 13px; }
+.loyalty-card-manage-actions button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #efc5c8; border-radius: 7px; background: #fff8f8; color: #b4111d; cursor: pointer; padding: 7px 10px; font-size: 10px; font-weight: 800; }
+.loyalty-card-manage-actions button:hover { border-color: #e30613; background: #fff0f1; }
+.loyalty-card-manage-actions .loyalty-delete-button { border-color: #efd6d0; background: #fff8f6; color: #b46654; }
+.loyalty-card-manage-actions .loyalty-delete-button:hover { border-color: #d99a8b; background: #fff0ec; }
 .loyalty-stamp.filled { border-color: #efbfc3; background: #fff0f1; color: #c8101e; }
 .loyalty-management-row { border-color: #e4e4e4; }
 .loyalty-management-actions button { border-color: #efc5c8; background: #fff8f8; color: #b4111d; }
