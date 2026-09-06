@@ -86,6 +86,7 @@ a { color: inherit; text-decoration: none; }
 .hero-story-card img { position: absolute; inset: 0; height: 100%; width: 100%; object-fit: cover; transition: opacity .35s ease; }
 .hero-loyalty-card { background: #dfe8d7; }
 .hero-loyalty-card:after { background: linear-gradient(90deg, rgba(235, 241, 224, .94) 0%, rgba(235, 241, 224, .68) 28%, rgba(235, 241, 224, 0) 69%); }
+.hero-personalization-card:after { background: linear-gradient(90deg, rgba(255, 249, 242, .22) 0%, rgba(255, 249, 242, .06) 34%, rgba(255, 249, 242, 0) 62%); }
 .hero-story-overlay { position: absolute; z-index: 2; left: 29px; bottom: 28px; max-width: 210px; }
 .hero-story-overlay span { display: block; color: #b46654; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .hero-story-overlay strong { display: block; margin-top: 7px; color: #392e28; font-family: var(--font-display); font-size: 23px; font-weight: 500; line-height: 1.08; }
