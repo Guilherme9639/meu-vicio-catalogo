@@ -43,7 +43,8 @@ const products: Product[] = [
 
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const HERO_SLIDE_INTERVAL = 9000;
+const HERO_SLIDE_INTERVAL = 12000;
+const PERSONALIZATION_SLIDE_INTERVAL = 9000;
 
 function imageAdjustStyle(adjust?: ImageAdjust) {
   const current = adjust || DEFAULT_IMAGE_ADJUST;
@@ -102,7 +103,7 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (heroSlide !== 0) return;
-    const timer = window.setInterval(() => setPersonalizationImage((current) => (current + 1) % personalizationImages.length), 5200);
+    const timer = window.setInterval(() => setPersonalizationImage((current) => (current + 1) % personalizationImages.length), PERSONALIZATION_SLIDE_INTERVAL);
     return () => window.clearInterval(timer);
   }, [heroSlide]);
   useEffect(() => {
