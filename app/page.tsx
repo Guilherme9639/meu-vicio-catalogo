@@ -102,10 +102,10 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    if (heroSlide !== 0) return;
+    
     const timer = window.setInterval(() => setPersonalizationImage((current) => (current + 1) % personalizationImages.length), PERSONALIZATION_SLIDE_INTERVAL);
     return () => window.clearInterval(timer);
-  }, [heroSlide]);
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.heroSlide = String(heroSlide);
     return () => { delete document.documentElement.dataset.heroSlide; };
