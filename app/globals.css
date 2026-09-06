@@ -448,6 +448,7 @@ a { color: inherit; text-decoration: none; }
 .admin-loyalty-section { margin-top: 34px; border-top: 1px solid #e4ece8; padding-top: 4px; }
 .admin-loyalty-intro { max-width: 680px; margin: -2px 0 16px; color: #789084; font-size: 11px; line-height: 1.5; }
 .admin-loyalty-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.loyalty-search { max-width: 520px; margin: 2px 0 15px; }
 .admin-loyalty-form label { display: grid; gap: 7px; color: #72877d; font-size: 10px; font-weight: 800; }
 .admin-loyalty-form input, .loyalty-card-actions input { width: 100%; border: 1px solid #d8e6df; border-radius: 7px; outline: 0; background: #fff; color: #365548; padding: 10px 11px; font: inherit; font-size: 11px; }
 .admin-loyalty-form input:focus, .loyalty-card-actions input:focus { border-color: #73a88b; box-shadow: 0 0 0 3px rgba(115,168,139,.12); }
