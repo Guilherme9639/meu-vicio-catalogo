@@ -15,9 +15,9 @@ type PersonalizationImage = { src: string; alt: string };
 
 const DEFAULT_STORE_SETTINGS: StoreSettings = { storeName: 'Meu Vício', hours: 'Segunda a sábado • 9h às 18h', whatsappPrimary: '5531994483976', whatsappSecondary: '5531999999999', whatsappSecondaryLabel: 'Número de demonstração', whatsappMessage: 'Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido.' };
 const personalizationImages: PersonalizationImage[] = [
-  { src: '/products/personalizacao-capa.jpg', alt: 'Chinelos brancos personalizados em destaque' },
-  { src: '/products/personalizacao-2.jpg', alt: 'Par de chinelos claros com detalhes personalizados' },
-  { src: '/products/personalizacao-3.jpg', alt: 'Chinelos personalizados em várias cores' },
+  { src: '/products/personalizacao-capa.jpg', alt: 'Chinelos personalizados em várias cores, com todos os modelos visíveis' },
+  { src: '/products/personalizacao-2.jpg', alt: 'Chinelos brancos personalizados em destaque' },
+  { src: '/products/personalizacao-3.jpg', alt: 'Par de chinelos claros com detalhes personalizados' },
 ];
 const sizeOptions: SizeOption[] = [
   { label: '16/17', values: [16, 17] }, { label: '18/19', values: [18, 19] },
