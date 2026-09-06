@@ -122,7 +122,7 @@ a { color: inherit; text-decoration: none; }
 .product-image.rosé { background: #ead3d1; }
 .product-image.preto { background: #dad8d4; }
 .product-image.azul-marinho { background: #d7dfe0; }
-.product-image img { position: relative; z-index: 1; height: 108%; width: 83%; object-fit: contain; transition: transform .35s ease; }
+.product-image img { position: relative; z-index: 1; height: 100%; width: 100%; box-sizing: border-box; object-fit: contain; object-position: center; padding: 14px 18px; transition: transform .35s ease; }
 .product-card:hover .product-image img { transform: scale(1.05) rotate(-2deg); }
 .product-tag { position: absolute; z-index: 3; left: 12px; top: 12px; border-radius: 99px; background: #2e6150; color: #f4fbf6; padding: 5px 9px; font-size: 9px; font-weight: 800; letter-spacing: .05em; }
 .product-heart { position: absolute; z-index: 3; right: 10px; top: 10px; display: grid; height: 31px; width: 31px; place-items: center; border: 1px solid rgba(160, 122, 103, .24); border-radius: 50%; background: rgba(255,250,245,.78); color: #8e6e60; cursor: pointer; }
@@ -162,7 +162,7 @@ a { color: inherit; text-decoration: none; }
 .size-modal { position: relative; display: grid; width: min(690px, 100%); grid-template-columns: .8fr 1.2fr; overflow: hidden; border-radius: 23px; background: #fffaf5; box-shadow: 0 24px 70px rgba(49, 32, 24, .22); }
 .modal-close { position: absolute; z-index: 2; right: 14px; top: 14px; display: grid; height: 34px; width: 34px; place-items: center; border: 1px solid #e4d6ca; border-radius: 50%; background: #fffaf5; color: #755f52; cursor: pointer; }
 .modal-product-image { display: grid; min-height: 350px; place-items: center; background: #ebded4; }
-.modal-product-image img { height: 85%; width: 90%; object-fit: contain; }
+.modal-product-image img { height: 100%; width: 100%; box-sizing: border-box; object-fit: contain; object-position: center; padding: 24px; }
 .modal-content { padding: 44px 31px 31px; }
 .modal-content h2 { margin: 8px 0; font-family: var(--font-display); font-size: 33px; font-weight: 500; line-height: .98; }
 .modal-content p { margin: 0; color: #887369; font-size: 12px; line-height: 1.6; }
