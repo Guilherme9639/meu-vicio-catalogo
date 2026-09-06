@@ -581,3 +581,54 @@ a { color: inherit; text-decoration: none; }
 #categorias form label { color: #666 !important; }
 #categorias form input { border-color: #dedede !important; color: #2d2d2d !important; }
 #categorias > div:last-child span { border-color: #efc5c8 !important; background: #fff8f8 !important; color: #b4111d !important; }
+
+/* Alinhamento final com a identidade Havaianas do catálogo. */
+.admin-shell, .admin-auth-shell { background: #fff; }
+.admin-sidebar { border-right-color: #e8e8e8; background: #fff; }
+.admin-sidebar-bottom { border-top-color: #ededed; }
+.admin-menu a { color: #5f5f5f; }
+.admin-menu a:hover, .admin-menu a.active { background: #fff0f1; color: #c8101e; }
+.admin-menu a span, .admin-user-avatar { background: #fbe5e7; color: #c8101e; }
+.admin-topbar { background: #fff; }
+.admin-breadcrumb, .stat-card small, .products-table th, .admin-settings-card span { color: #858585; }
+.admin-topbar h1, .admin-section-head h2, .stat-card strong { color: #242424; }
+.admin-topbar h1 span, .admin-kicker { color: #e30613; }
+.admin-top-actions > button { border-color: #e5e5e5; color: #777; }
+.admin-top-actions > button:hover { border-color: #efbfc3; color: #e30613; }
+.stat-card, .products-table-wrap, .loyalty-card, .admin-settings-card { border-color: #e4e4e4; background: #fff; }
+.stat-icon, .stat-icon.green, .stat-icon.sand, .stat-icon.lilac { background: #fff0f1; color: #e30613; }
+.stat-card em { color: #777; }
+.admin-search { border-color: #e2e2e2; }
+.admin-search > svg { color: #e30613; }
+.admin-search input, .products-table td { color: #595959; }
+.status-filter { border-color: #e2e2e2; color: #666; }
+.status-filter select { color: #444; }
+.products-table th { background: #fafafa; }
+.table-product { color: #2d2d2d; }
+.table-product img, .table-product-image-button { background: #f3f3f3; }
+.table-sizes span { background: #fff0f1; color: #b4111d; }
+.table-price { color: #b90f1d !important; }
+.status.active { background: #fff0f1; color: #c8101e; }
+.status.draft { background: #f2f2f2; color: #777; }
+.row-menu { color: #888; }
+.row-menu:hover, .row-menu-danger:hover { color: #e30613; }
+.admin-help-card { border-color: #f0cdd0; background: #fff3f4; }
+.help-illustration { background: #fbe0e3; color: #d71920; }
+.admin-help-card h3 { color: #5a3034; }
+.admin-help-card p { color: #8d686c; }
+.admin-loyalty-form input, .loyalty-card-actions input, .admin-settings-card input, .admin-settings-card textarea { border-color: #dedede; color: #2d2d2d; }
+.admin-loyalty-form input:focus, .loyalty-card-actions input:focus, .admin-settings-card input:focus, .admin-settings-card textarea:focus { border-color: #e30613; box-shadow: 0 0 0 3px rgba(227, 6, 19, .1); }
+.loyalty-see-more { border-color: #efbfc3; background: #fff8f8; color: #b4111d; }
+.loyalty-see-more:hover { border-color: #e30613; background: #fff0f1; }
+.loyalty-card-head h3, .loyalty-management-row strong { color: #2d2d2d; }
+.loyalty-card-head p, .loyalty-management-row span, .stock-history-intro { color: #777; }
+.loyalty-stamp { border-color: #dedede; color: #888; }
+.loyalty-stamp.filled { border-color: #efbfc3; background: #fff0f1; color: #c8101e; }
+.loyalty-complete-note { color: #c8101e; }
+.loyalty-management-row { border-color: #e4e4e4; }
+.loyalty-management-actions button { border-color: #efc5c8; background: #fff8f8; color: #b4111d; }
+.loyalty-management-actions button:hover { border-color: #e30613; background: #fff0f1; }
+.order-whatsapp-link { color: #c8101e; text-decoration-color: #efbfc3; }
+.order-status-select { border-color: #efc5c8; background: #fff8f8; color: #b4111d; }
+.admin-mobile-nav { border-bottom-color: #e5e5e5; background: #fff; }
+.admin-mobile-nav a { border-color: #efc5c8; background: #fff8f8; color: #b4111d; }
