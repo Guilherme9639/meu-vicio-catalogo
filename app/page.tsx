@@ -44,8 +44,8 @@ const products: Product[] = [
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const HERO_SLIDE_INTERVAL = 10000;
-const FIDELITY_HERO_INTERVAL = 10000;
-const PERSONALIZATION_SLIDE_INTERVAL = 5000;
+const FIDELITY_HERO_INTERVAL = 6000;
+const PERSONALIZATION_SLIDE_INTERVAL = 3000;
 
 function imageAdjustStyle(adjust?: ImageAdjust) {
   const current = adjust || DEFAULT_IMAGE_ADJUST;
