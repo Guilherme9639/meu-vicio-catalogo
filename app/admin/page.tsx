@@ -237,7 +237,7 @@ export default function AdminPage() {
     resetProductForm();
     setShowForm(false);
   }
-  async function updateOrderStatus(id: string, status: string) {
+  async function updateOrderStatus(id: string, status: string) {<th>Status</th><th>Ações</th></tr></thead></select></td><td><div className="row-actions"><button type="button" className="row-menu row-menu-danger" onClick={() => deleteOrder(order)} aria-label={`Excluir pedido ${order.id.slice(0, 8)}`} title="Excluir pedido"><Trash2 size={16} /></button></div></td></tr>) :
     if (!supabase || !session) return;
     const currentOrder = orders.find((order) => order.id === id);
     const shouldDeductStock = status === 'Confirmado' && currentOrder?.status !== 'Confirmado' && !currentOrder?.stockDeducted;
@@ -264,6 +264,21 @@ export default function AdminPage() {
     }
     setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: order.stockDeducted || shouldDeductStock } : order));
     setActionMessage(shouldDeductStock ? 'Pedido confirmado e estoque atualizado.' : 'Status do pedido atualizado.');
+  async function deleteOrder(order: AdminOrder) {
+    if (!supabase || !session) return;
+    const confirmed = window.confirm(`Excluir o pedido #${order.id.slice(0, 8).toUpperCase()}? Essa ação remove o registro e os itens vinculados. Se o pedido já foi confirmado, o estoque não será devolvido automaticamente.`);
+    if (!confirmed) return;
+    setActionMessage('Excluindo pedido...');
+    const firstAttempt = await supabase.from('orders').delete().eq('id', order.id);
+    if (firstAttempt.error) {
+      const itemsResult = await supabase.from('order_items').delete().eq('order_id', order.id);
+      if (itemsResult.error) { setActionMessage('Não foi possível excluir os itens vinculados ao pedido.'); return; }
+      const retry = await supabase.from('orders').delete().eq('id', order.id);
+      if (retry.error) { setActionMessage('Não foi possível excluir o pedido.'); return; }
+    }
+    setOrders((current) => current.filter((item) => item.id !== order.id));
+    setActionMessage('Pedido excluído com sucesso.');
+  }
   }
   function exportOrders() {
     const escapeCell = (value: string | number | null) => `"${String(value ?? '').replace(/"/g, '""')}"`;
