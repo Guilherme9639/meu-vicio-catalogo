@@ -9,11 +9,11 @@ import { DEFAULT_IMAGE_ADJUST, parseImageUrl, type ImageAdjust } from '@/lib/ima
 type Product = { id: string; name: string; category: string; color: string; price: number; description: string; image: string; imageAdjust?: ImageAdjust; sizes: Record<number, number>; tag?: string };
 type SizeOption = { label: string; values: number[] };
 type CartItem = Product & { selectedSize: string; quantity: number };
-type StoreSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
+type StoreSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappPrimaryLabel: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
 type PersonalizationImage = { src: string; alt: string };
 
 
-const DEFAULT_STORE_SETTINGS: StoreSettings = { storeName: 'Meu Vício', hours: 'Segunda a sábado • 9h às 18h', whatsappPrimary: '5531994483976', whatsappSecondary: '5531999999999', whatsappSecondaryLabel: 'Número de demonstração', whatsappMessage: 'Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido.' };
+const DEFAULT_STORE_SETTINGS: StoreSettings = { storeName: 'Meu Vício', hours: 'Segunda a sábado • 9h às 18h', whatsappPrimary: '5531994483976', whatsappPrimaryLabel: 'Atendimento principal', whatsappSecondary: '5531999999999', whatsappSecondaryLabel: 'Número de demonstração', whatsappMessage: 'Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido.' };
 const personalizationImages: PersonalizationImage[] = [
   { src: '/products/personalizacao-capa.jpg', alt: 'Chinelos personalizados em várias cores, com todos os modelos visíveis' },
   { src: '/products/personalizacao-2.jpg', alt: 'Chinelos brancos personalizados em destaque' },
@@ -141,9 +141,9 @@ export default function Home() {
     let mounted = true;
     async function loadSettings() {
       if (!supabase) return;
-      const { data } = await supabase.from('store_settings').select('store_name,hours,whatsapp_primary,whatsapp_secondary,whatsapp_secondary_label,whatsapp_message').eq('id', 'default').maybeSingle();
+            const { data } = await supabase.from('store_settings').select('store_name,hours,whatsapp_primary,whatsapp_primary_label,whatsapp_secondary,whatsapp_secondary_label,whatsapp_message').eq('id', 'default').maybeSingle();
       if (!mounted || !data) return;
-      setSettings({ storeName: data.store_name, hours: data.hours, whatsappPrimary: data.whatsapp_primary, whatsappSecondary: data.whatsapp_secondary, whatsappSecondaryLabel: data.whatsapp_secondary_label, whatsappMessage: data.whatsapp_message });
+            setSettings({ storeName: data.store_name, hours: data.hours, whatsappPrimary: data.whatsapp_primary, whatsappPrimaryLabel: data.whatsapp_primary_label || 'Atendimento principal', whatsappSecondary: data.whatsapp_secondary, whatsappSecondaryLabel: data.whatsapp_secondary_label, whatsappMessage: data.whatsapp_message });
     }
     loadSettings();
     return () => { mounted = false; };
@@ -209,7 +209,7 @@ export default function Home() {
 
 
   const whatsappContacts = [
-    { id: 'atendimento-1', name: 'Atendimento 1', number: settings.whatsappPrimary, detail: settings.whatsappPrimary, demo: false },
+        { id: 'atendimento-1', name: settings.whatsappPrimaryLabel || 'Atendimento principal', number: settings.whatsappPrimary, detail: settings.whatsappPrimary, demo: false },
     { id: 'atendimento-2', name: 'Atendimento 2', number: settings.whatsappSecondary, detail: settings.whatsappSecondaryLabel, demo: true },
   ];
   return <main className="site-shell min-h-screen overflow-x-hidden bg-white text-[#1e1e1e]">
