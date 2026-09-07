@@ -270,13 +270,10 @@ export default function AdminPage() {
     const confirmed = window.confirm(`Excluir o pedido #${order.id.slice(0, 8).toUpperCase()}? Essa ação remove o registro e os itens vinculados. Se o pedido já foi confirmado, o estoque não será devolvido automaticamente.`);
     if (!confirmed) return;
     setActionMessage('Excluindo pedido...');
-    const firstAttempt = await supabase.from('orders').delete().eq('id', order.id);
-    if (firstAttempt.error) {
-      const itemsResult = await supabase.from('order_items').delete().eq('order_id', order.id);
-      if (itemsResult.error) { setActionMessage('Não foi possível excluir os itens vinculados ao pedido.'); return; }
-      const retry = await supabase.from('orders').delete().eq('id', order.id);
-      if (retry.error) { setActionMessage('Não foi possível excluir o pedido.'); return; }
-    }
+    const itemsResult = await supabase.from('order_items').delete().eq('order_id', order.id);
+    if (itemsResult.error) { setActionMessage('Não foi possível excluir os itens vinculados ao pedido.'); return; }
+    const orderResult = await supabase.from('orders').delete().eq('id', order.id);
+    if (orderResult.error) { setActionMessage('Não foi possível excluir o pedido.'); return; }
     setOrders((current) => current.filter((item) => item.id !== order.id));
     setActionMessage('Pedido excluído com sucesso.');
   }
