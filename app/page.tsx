@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Filter, Heart, Menu, MessageCircle, Minus, Plus, Search, ShoppingBag, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Filter, Heart, Menu, MessageCircle, Minus, Plus, Search, ShoppingBag, Sparkles, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_IMAGE_ADJUST, parseImageUrl, type ImageAdjust } from '@/lib/image-adjust';
 
@@ -31,6 +31,11 @@ const sizeOptions: SizeOption[] = [
 ];
 const adultSizeOptions = sizeOptions.filter((option) => option.values[0] >= 33);
 const infantSizeOptions = sizeOptions.filter((option) => option.values[0] <= 32);
+function getAvailableQuantity(product: Product, size: string) {
+  const option = sizeOptions.find((item) => item.label === size);
+  if (!option) return 0;
+  return Math.max(...option.values.map((value) => Number(product.sizes[value] ?? 0)), 0);
+}
 const products: Product[] = [
   { id: 'demo-1', name: 'Brasil Logo Branco', category: 'Adulto', color: 'Branco', price: 39.9, description: 'O clássico brasileiro para todos os dias.', image: '/products/havaianas-branco.png', sizes: { 33: 2, 34: 0, 35: 4, 36: 3, 37: 5, 38: 2, 39: 0, 40: 1 }, tag: 'Mais vendido' },
   { id: 'demo-2', name: 'Top Rosé', category: 'Adulto', color: 'Rosé', price: 34.9, description: 'Leve, confortável e com cor para destacar o look.', image: '/products/havaianas-branco.png', sizes: { 33: 0, 34: 2, 35: 0, 36: 4, 37: 2, 38: 3, 39: 2, 40: 0 }, tag: 'Novidade' },
@@ -85,6 +90,7 @@ export default function Home() {
   const [catalogLoading, setCatalogLoading] = useState(Boolean(supabase));
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartNotice, setCartNotice] = useState('');
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
   const [customerDetails, setCustomerDetails] = useState({ name: '', notes: '' });
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -148,11 +154,58 @@ export default function Home() {
   const filteredProducts = useMemo(() => catalogProducts.filter((product) => { const term = search.trim().toLowerCase(); const selectedOption = sizeOptions.find((option) => option.label === selectedSize); const hasSize = !selectedOption || selectedOption.values.some((value) => (product.sizes[value] ?? 0) > 0); return (category === 'Todos' || product.category === category) && hasSize && (!term || `${product.name} ${product.color}`.toLowerCase().includes(term)) && (!showFavoritesOnly || favorites.includes(product.id)); }), [catalogProducts, category, search, selectedSize, showFavoritesOnly, favorites]);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
-  function addToCart(product: Product, size: string) { setCart((current) => { const existing = current.find((item) => item.id === product.id && item.selectedSize === size); if (existing) return current.map((item) => item.id === product.id && item.selectedSize === size ? { ...item, quantity: item.quantity + 1 } : item); return [...current, { ...product, selectedSize: size, quantity: 1 }]; }); setActiveProduct(null); setCartOpen(true); }
+  function addToCart(product: Product, size: string) {
+    const availableQuantity = getAvailableQuantity(product, size);
+    const existing = cart.find((item) => item.id === product.id && item.selectedSize === size);
+    if (availableQuantity <= 0) {
+      setCartNotice(`O tamanho ${size} de ${product.name} está esgotado.`);
+      setActiveProduct(null);
+      setCartOpen(true);
+      return;
+    }
+    if ((existing?.quantity ?? 0) >= availableQuantity) {
+      setCartNotice(`Temos apenas ${availableQuantity} ${availableQuantity === 1 ? 'par' : 'pares'} de ${product.name} no tamanho ${size}.`);
+      setActiveProduct(null);
+      setCartOpen(true);
+      return;
+    }
+    setCart((current) => {
+      if (existing) return current.map((item) => item.id === product.id && item.selectedSize === size ? { ...item, quantity: item.quantity + 1 } : item);
+      return [...current, { ...product, selectedSize: size, quantity: 1 }];
+    });
+    setCartNotice('');
+    setActiveProduct(null);
+    setCartOpen(true);
+  }
   function toggleFavorite(id: string) { setFavorites((current) => { const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id]; window.localStorage.setItem('meu-vicio-favoritos', JSON.stringify(next)); return next; }); }
-  function updateQuantity(id: string, size: string, direction: number) { setCart((current) => current.map((item) => item.id === id && item.selectedSize === size ? { ...item, quantity: item.quantity + direction } : item).filter((item) => item.quantity > 0)); }
+  function updateQuantity(id: string, size: string, direction: number) {
+    const item = cart.find((currentItem) => currentItem.id === id && currentItem.selectedSize === size);
+    if (direction > 0 && item) {
+      const availableQuantity = getAvailableQuantity(item, size);
+      if (item.quantity >= availableQuantity) {
+        setCartNotice(availableQuantity > 0 ? `Temos apenas ${availableQuantity} ${availableQuantity === 1 ? 'par' : 'pares'} de ${item.name} no tamanho ${size}.` : `O tamanho ${size} de ${item.name} ficou esgotado.`);
+        return;
+      }
+    }
+    setCart((current) => current.map((cartItem) => cartItem.id === id && cartItem.selectedSize === size ? { ...cartItem, quantity: cartItem.quantity + direction } : cartItem).filter((cartItem) => cartItem.quantity > 0));
+    if (direction < 0) setCartNotice('');
+  }
+  function removeFromCart(id: string, size: string) {
+    setCart((current) => current.filter((item) => !(item.id === id && item.selectedSize === size)));
+    setCartNotice('');
+  }
+  function validateCartStock() {
+    const unavailableItem = cart.find((item) => item.quantity > getAvailableQuantity(item, item.selectedSize));
+    if (!unavailableItem) {
+      setCartNotice('');
+      return true;
+    }
+    const availableQuantity = getAvailableQuantity(unavailableItem, unavailableItem.selectedSize);
+    setCartNotice(availableQuantity > 0 ? `Ajuste a quantidade de ${unavailableItem.name}: temos apenas ${availableQuantity} ${availableQuantity === 1 ? 'par' : 'pares'} no tamanho ${unavailableItem.selectedSize}.` : `O tamanho ${unavailableItem.selectedSize} de ${unavailableItem.name} ficou esgotado.`);
+    return false;
+  }
   function recordOrder(number: string) { if (!supabase || !cart.length) return; const orderId = crypto.randomUUID(); const orderItems = cart.map((item) => ({ order_id: orderId, product_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id) ? item.id : null, product_name: item.name, selected_size: item.selectedSize, quantity: item.quantity, unit_price: item.price })); void supabase.from('orders').insert({ id: orderId, whatsapp_number: number, customer_name: customerDetails.name.trim() || null, notes: customerDetails.notes.trim() || null, total: cartTotal, status: 'Novo' }).then(({ error }) => error ? null : supabase.from('order_items').insert(orderItems)); }
-  function sendToWhatsApp(number: string) { if (!cart.length) return; const lines = cart.map((item) => `- ${item.name} | tamanho ${item.selectedSize} | qtd. ${item.quantity} | ${money(item.price * item.quantity)}`); const customerLine = customerDetails.name.trim() ? `Cliente: ${customerDetails.name.trim()}` : ''; const notesLine = customerDetails.notes.trim() ? `Observações: ${customerDetails.notes.trim()}` : ''; const message = [settings.whatsappMessage, '', customerLine, ...lines, '', notesLine, notesLine ? '' : null, `Total estimado: ${money(cartTotal)}`, '', 'Podem confirmar a disponibilidade e as formas de pagamento?'].filter((line): line is string => line !== null).join('\n'); window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank'); recordOrder(number); }
+  function sendToWhatsApp(number: string) { if (!cart.length || !validateCartStock()) return; const lines = cart.map((item) => `- ${item.name} | tamanho ${item.selectedSize} | qtd. ${item.quantity} | ${money(item.price * item.quantity)}`); const customerLine = customerDetails.name.trim() ? `Cliente: ${customerDetails.name.trim()}` : ''; const notesLine = customerDetails.notes.trim() ? `Observações: ${customerDetails.notes.trim()}` : ''; const message = [settings.whatsappMessage, '', customerLine, ...lines, '', notesLine, notesLine ? '' : null, `Total estimado: ${money(cartTotal)}`, '', 'Podem confirmar a disponibilidade e as formas de pagamento?'].filter((line): line is string => line !== null).join('\n'); window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank'); recordOrder(number); }
 
 
   const whatsappContacts = [
@@ -167,7 +220,7 @@ export default function Home() {
     <footer id="contato" className="site-footer"><div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-8 sm:flex-row sm:items-end sm:justify-between lg:px-8"><div><Brand storeName={settings.storeName} /><p className="mt-3 max-w-sm text-sm leading-6 text-[#826f63]">Calçados escolhidos para fazer parte dos seus momentos.</p></div><div className="text-left sm:text-right"><p className="footer-label">Atendimento</p><a href={`https://wa.me/${settings.whatsappPrimary}`} target="_blank" rel="noreferrer" className="footer-phone">{settings.whatsappPrimary}</a><p className="text-xs text-[#9e897a]">{settings.hours}</p></div></div></footer>
     {activeProduct && <div className="modal-backdrop" role="presentation" onClick={() => setActiveProduct(null)}><div className="size-modal" role="dialog" aria-modal="true" aria-labelledby="size-modal-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={() => setActiveProduct(null)} aria-label="Fechar"><X size={19} /></button><div className="modal-product-image"><img style={imageAdjustStyle(activeProduct.imageAdjust)} src={activeProduct.image} alt="" /></div><div className="modal-content"><span className="product-category">Havaianas {activeProduct.category.toLowerCase()} • {activeProduct.color}</span><h2 id="size-modal-title">{activeProduct.name}</h2><p>{activeProduct.description}</p><strong className="modal-price">{money(activeProduct.price)}</strong><span className="modal-label">Escolha o tamanho</span><div className="modal-sizes">{(activeProduct.category === 'Adulto' ? adultSizeOptions : activeProduct.category === 'Infantil' ? infantSizeOptions : sizeOptions).map((option) => { const available = option.values.some((value) => (activeProduct.sizes[value] ?? 0) > 0); return <button disabled={!available} className={available ? 'size-chip' : 'size-chip unavailable'} type="button" key={option.label} onClick={() => addToCart(activeProduct, option.label)}>{option.label}</button>; })}</div><small className="modal-hint">As faixas apagadas estão indisponíveis no momento.</small></div></div></div>}
     {imagePreviewProduct && <div className="modal-backdrop full-image-backdrop" role="presentation" onClick={() => setImagePreviewProduct(null)}><div className="full-image-modal" role="dialog" aria-modal="true" aria-labelledby="full-image-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={() => setImagePreviewProduct(null)} aria-label="Fechar foto completa"><X size={19} /></button><div className="full-image-frame"><img src={imagePreviewProduct.image} alt={`${imagePreviewProduct.name} - ${imagePreviewProduct.color}`} /></div><div className="full-image-caption"><span className="product-category">Havaianas {imagePreviewProduct.category.toLowerCase()} • {imagePreviewProduct.color}</span><h2 id="full-image-title">{imagePreviewProduct.name}</h2><button className="choose-button" type="button" onClick={() => { setImagePreviewProduct(null); setActiveProduct(imagePreviewProduct); }}>Escolher tamanho <ArrowRight size={16} /></button></div></div></div>}
-    {cartOpen && <div className="drawer-backdrop" role="presentation" onClick={() => setCartOpen(false)}><aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" onClick={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="eyebrow warm">seu pedido</span><h2 id="cart-title">Minha sacola <span>({cartCount})</span></h2></div><button className="modal-close" type="button" onClick={() => setCartOpen(false)} aria-label="Fechar sacola"><X size={19} /></button></div>{cart.length ? <><div className="drawer-items">{cart.map((item) => <div className="drawer-item" key={`${item.id}-${item.selectedSize}`}><div className="drawer-thumb"><img src={item.image} alt="" /></div><div className="min-w-0 flex-1"><h3>{item.name}</h3><p>Tamanho {item.selectedSize} • {money(item.price)}</p><div className="quantity-control"><button type="button" onClick={() => updateQuantity(item.id, item.selectedSize, -1)}><Minus size={13} /></button><span>{item.quantity}</span><button type="button" onClick={() => updateQuantity(item.id, item.selectedSize, 1)}><Plus size={13} /></button></div></div><strong>{money(item.price * item.quantity)}</strong></div>)}</div><div className="drawer-order-fields"><label>Seu nome (opcional)<input value={customerDetails.name} onChange={(event) => setCustomerDetails({ ...customerDetails, name: event.target.value })} placeholder="Ex.: Maria Silva" /></label><label>Observações (opcional)<textarea value={customerDetails.notes} onChange={(event) => setCustomerDetails({ ...customerDetails, notes: event.target.value })} placeholder="Ex.: cor ou preferência de entrega" rows={2} /></label></div><div className="drawer-total"><span>Total estimado</span><strong>{money(cartTotal)}</strong></div><button className="whatsapp-button" type="button" onClick={() => setContactPickerOpen(true)}>Enviar pedido pelo WhatsApp <ArrowRight size={17} /></button><button className="continue-shopping-button secondary-button" type="button" onClick={() => { setCartOpen(false); document.getElementById('colecao')?.scrollIntoView({ behavior: 'smooth' }); }}>Continuar comprando <ArrowRight size={16} /></button><p className="drawer-note">A loja confirmará disponibilidade, pagamento e entrega pelo WhatsApp.</p></> : <div className="empty-cart"><ShoppingBag size={30} /><h3>Sua sacola está vazia</h3><p>Escolha um modelo e um tamanho para começar.</p><button className="primary-button" type="button" onClick={() => setCartOpen(false)}>Ver produtos</button></div>}</aside></div>}
+    {cartOpen && <div className="drawer-backdrop" role="presentation" onClick={() => setCartOpen(false)}><aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" onClick={(event) => event.stopPropagation()}><div className="drawer-header"><div><span className="eyebrow warm">seu pedido</span><h2 id="cart-title">Minha sacola <span>({cartCount})</span></h2></div><button className="modal-close" type="button" onClick={() => setCartOpen(false)} aria-label="Fechar sacola"><X size={19} /></button></div>{cart.length ? <><div className="drawer-items">{cart.map((item) => <div className="drawer-item" key={`${item.id}-${item.selectedSize}`}><div className="drawer-thumb"><img src={item.image} alt="" /></div><div className="min-w-0 flex-1"><h3>{item.name}</h3><p>Tamanho {item.selectedSize} • {money(item.price)}</p><div className="quantity-control"><button type="button" onClick={() => updateQuantity(item.id, item.selectedSize, -1)}><Minus size={13} /></button><span>{item.quantity}</span><button type="button" onClick={() => updateQuantity(item.id, item.selectedSize, 1)}><Plus size={13} /></button></div></div><strong>{money(item.price * item.quantity)}</strong><button className="remove-cart-item" type="button" aria-label={`Remover ${item.name} do pedido`} title="Remover produto" onClick={() => removeFromCart(item.id, item.selectedSize)}><Trash2 size={16} /></button></div>)}</div>{cartNotice && <div className="cart-stock-notice" role="alert">{cartNotice}</div>}<div className="drawer-order-fields"><label>Seu nome (opcional)<input value={customerDetails.name} onChange={(event) => setCustomerDetails({ ...customerDetails, name: event.target.value })} placeholder="Ex.: Maria Silva" /></label><label>Observações (opcional)<textarea value={customerDetails.notes} onChange={(event) => setCustomerDetails({ ...customerDetails, notes: event.target.value })} placeholder="Ex.: cor ou preferência de entrega" rows={2} /></label></div><div className="drawer-total"><span>Total estimado</span><strong>{money(cartTotal)}</strong></div><button className="whatsapp-button" type="button" onClick={() => { if (validateCartStock()) setContactPickerOpen(true); }}>Enviar pedido pelo WhatsApp <ArrowRight size={17} /></button><button className="continue-shopping-button secondary-button" type="button" onClick={() => { setCartOpen(false); document.getElementById('colecao')?.scrollIntoView({ behavior: 'smooth' }); }}>Continuar comprando <ArrowRight size={16} /></button><p className="drawer-note">A loja confirmará disponibilidade, pagamento e entrega pelo WhatsApp.</p></> : <div className="empty-cart"><ShoppingBag size={30} /><h3>Sua sacola está vazia</h3><p>Escolha um modelo e um tamanho para começar.</p><button className="primary-button" type="button" onClick={() => setCartOpen(false)}>Ver produtos</button></div>}</aside></div>}
 
     {contactPickerOpen && <div className="modal-backdrop" role="presentation" onClick={() => setContactPickerOpen(false)}><div className="contact-modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" type="button" onClick={() => setContactPickerOpen(false)} aria-label="Fechar escolha de atendimento"><X size={19} /></button><span className="eyebrow warm">escolha o atendimento</span><h2 id="contact-modal-title">Para quem você quer enviar?</h2><p>O pedido será enviado com os produtos, tamanhos e quantidades escolhidos.</p><div className="contact-options">{whatsappContacts.map((contact) => <button className="contact-option" type="button" key={contact.id} onClick={() => { setContactPickerOpen(false); setCartOpen(false); sendToWhatsApp(contact.number); }}><span className="contact-option-icon"><MessageCircle size={19} /></span><span className="contact-option-copy"><strong>{contact.name}{contact.demo && <em> demonstração</em>}</strong><small>{contact.detail}</small></span><ArrowRight size={16} /></button>)}</div><small className="contact-demo-note">O segundo atendimento está configurado apenas para demonstração.</small></div></div>}
   </main>;
