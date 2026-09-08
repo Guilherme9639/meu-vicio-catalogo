@@ -605,6 +605,18 @@ a { color: inherit; text-decoration: none; }
 .table-sizes span { background: #fff0f1; color: #c8101e; }
 .status.active { background: #fff0f1; color: #c8101e; }
 .loyalty-see-more { border-color: #efbfc3; color: #b4111d; }
+.category-size-config-list { display: grid; gap: 10px; margin-top: 20px; }
+.category-size-config-intro { display: grid; gap: 4px; margin-bottom: 2px; }
+.category-size-config-intro strong { color: #303030; font-size: 14px; }
+.category-size-config-intro span, .category-size-config-note { color: #789084; font-size: 11px; line-height: 1.45; }
+.category-size-config { display: grid; grid-template-columns: minmax(145px, .35fr) minmax(0, 1fr) auto; align-items: end; gap: 12px; border: 1px solid #e4e4e4; border-radius: 10px; background: #fff; padding: 13px; }
+.category-size-config-name { display: grid; gap: 4px; align-self: center; }
+.category-size-config-name strong { color: #3a3a3a; font-size: 12px; }
+.category-size-config-name small { color: #98a7a1; font-size: 10px; line-height: 1.35; }
+.category-size-config label { display: grid; gap: 6px; color: #666; font-size: 10px; font-weight: 800; }
+.category-size-config input { width: 100%; border: 1px solid #dedede; border-radius: 8px; outline: 0; background: #fcfcfc; color: #2d2d2d; padding: 10px 11px; font: inherit; font-size: 12px; font-weight: 500; }
+.category-size-config input:focus { border-color: #e30613; box-shadow: 0 0 0 3px rgba(227, 6, 19, .1); }
+.category-size-config button { min-height: 38px; white-space: nowrap; }
 
 /* O painel usa uma navegação compacta no celular, sem comprimir o conteúdo. */
 @media (max-width: 760px) {
@@ -649,4 +661,6 @@ a { color: inherit; text-decoration: none; }
   .loyalty-management-actions button { flex: 1; justify-content: center; }
   .admin-settings-footer { align-items: stretch; flex-direction: column; }
   .admin-settings-footer .new-product-button { width: 100%; }
+  .category-size-config { grid-template-columns: 1fr; }
+  .category-size-config button { width: 100%; }
 }

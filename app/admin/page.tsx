@@ -38,6 +38,30 @@ const adminSizes: SizeOption[] = [
   { label: '39/40', values: [39, 40] }, { label: '41/42', values: [41, 42] },
   { label: '43/44', values: [43, 44] }, { label: '45/46', values: [45, 46] },
 ];
+const adminAdultSizeOptions = adminSizes.filter((option) => option.values[0] >= 33);
+const adminInfantSizeOptions = adminSizes.filter((option) => option.values[0] <= 32);
+function defaultOptionsForCategory(category: string) {
+  if (category === 'Adulto') return adminAdultSizeOptions;
+  if (category === 'Infantil') return adminInfantSizeOptions;
+  return adminSizes;
+}
+function parseCategorySizeDraft(value: string): SizeOption[] {
+  return value
+    .split(',')
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .map((label) => ({
+      label,
+      values: label
+        .split('/')
+        .map((value) => Number(value.trim()))
+        .filter((value) => Number.isFinite(value) && value > 0),
+    }))
+    .filter((option) => option.values.length > 0);
+}
+function formatCategorySizeOptions(options: SizeOption[]) {
+  return options.map((option) => option.label).join(', ');
+}
 
 export default function AdminPage() {
   const [items, setItems] = useState(initialProducts);
@@ -54,6 +78,9 @@ export default function AdminPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [categorySaving, setCategorySaving] = useState(false);
+  const [categorySizeOptions, setCategorySizeOptions] = useState<Record<string, SizeOption[]>>({ Adulto: adminAdultSizeOptions, Infantil: adminInfantSizeOptions });
+  const [categorySizeDrafts, setCategorySizeDrafts] = useState<Record<string, string>>({});
+  const [categorySizeSaving, setCategorySizeSaving] = useState<string | null>(null);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
@@ -91,20 +118,39 @@ export default function AdminPage() {
   useEffect(() => {
     if (!supabase || !session) return;
     let mounted = true;
-    async function loadCategories() {
-      const { data } = await supabase.from('categories').select('id,name').order('name', { ascending: true });
-      if (mounted && data?.length) setCategories(data as AdminCategory[]);
-    }
-    async function loadProducts() {
-      const { data } = await supabase.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,product_sizes(size,quantity)').order('created_at', { ascending: false });
-      if (!mounted || !data?.length) return;
-      setItems(data.map((row) => {
+    async function loadCatalog() {
+      const [{ data: categoryRows }, { data: categorySizeRows }, { data: productRows }] = await Promise.all([
+        supabase.from('categories').select('id,name').order('name', { ascending: true }),
+        supabase.from('category_sizes').select('category_id,size_label,size_values,sort_order').order('sort_order', { ascending: true }),
+        supabase.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,product_sizes(size,quantity)').order('created_at', { ascending: false }),
+      ]);
+      if (!mounted) return;
+      const nextCategories = (categoryRows || []) as AdminCategory[];
+      if (nextCategories.length) setCategories(nextCategories);
+      const categoryNamesById = new Map(nextCategories.map((category) => [category.id, category.name]));
+      const customOptions: Record<string, SizeOption[]> = {};
+      (categorySizeRows || []).forEach((row: { category_id: string; size_label: string; size_values: number[] }) => {
+        const categoryName = categoryNamesById.get(row.category_id);
+        const values = Array.isArray(row.size_values) ? row.size_values.map(Number).filter((value) => Number.isFinite(value) && value > 0) : [];
+        if (!categoryName || !row.size_label || !values.length) return;
+        (customOptions[categoryName] ||= []).push({ label: row.size_label, values });
+      });
+      const nextCategorySizeOptions: Record<string, SizeOption[]> = {};
+      nextCategories.forEach((category) => {
+        nextCategorySizeOptions[category.name] = customOptions[category.name] || defaultOptionsForCategory(category.name);
+      });
+      setCategorySizeOptions(nextCategorySizeOptions);
+      setCategorySizeDrafts(Object.fromEntries(nextCategories.map((category) => [category.id, formatCategorySizeOptions(nextCategorySizeOptions[category.name] || defaultOptionsForCategory(category.name))])));
+      if (!productRows?.length) return;
+      setItems(productRows.map((row) => {
+        const categoryName = String(row.category || 'Adulto');
+        const options = nextCategorySizeOptions[categoryName] || defaultOptionsForCategory(categoryName);
         const sizeQuantities = Object.fromEntries((row.product_sizes || []).map((item: { size: number; quantity: number }) => {
-          const option = adminSizes.find((candidate) => candidate.values.includes(item.size));
+          const option = options.find((candidate) => candidate.values.includes(item.size));
           return [option?.label || String(item.size), item.quantity];
         }));
         const image = parseImageUrl(row.image_url);
-        return { id: row.id, name: row.name, category: String(row.category || 'Adulto'), color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust };
+        return { id: row.id, name: row.name, category: categoryName, color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust };
       }));
     }
     async function loadOrders() {
@@ -135,8 +181,7 @@ export default function AdminPage() {
       const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Administrador';
       setProfile({ fullName: data?.full_name || fallbackName });
     }
-    loadCategories();
-    loadProducts();
+    loadCatalog();
     loadOrders();
     loadStockMovements();
     loadLoyaltyCards();
@@ -196,6 +241,37 @@ export default function AdminPage() {
     setForm((current) => ({ ...current, category: name }));
     setCategorySaving(false);
   }
+  function getOptionsForCategory(category: string) {
+    return categorySizeOptions[category] || defaultOptionsForCategory(category);
+  }
+  async function saveCategorySizes(event: FormEvent, category: AdminCategory) {
+    event.preventDefault();
+    const options = parseCategorySizeDraft(categorySizeDrafts[category.id] || '');
+    if (!options.length) {
+      setCategoryError(`Informe pelo menos um tamanho para ${category.name}.`);
+      return;
+    }
+    setCategorySizeSaving(category.id);
+    setCategoryError('');
+    if (supabase && session) {
+      const removeResult = await supabase.from('category_sizes').delete().eq('category_id', category.id);
+      if (removeResult.error) {
+        setCategoryError('Não foi possível atualizar os tamanhos desta categoria.');
+        setCategorySizeSaving(null);
+        return;
+      }
+      const insertResult = await supabase.from('category_sizes').insert(options.map((option, index) => ({ category_id: category.id, size_label: option.label, size_values: option.values, sort_order: index })));
+      if (insertResult.error) {
+        setCategoryError('Não foi possível salvar os tamanhos. Confira a estrutura do Supabase.');
+        setCategorySizeSaving(null);
+        return;
+      }
+    }
+    setCategorySizeOptions((current) => ({ ...current, [category.name]: options }));
+    setCategorySizeDrafts((current) => ({ ...current, [category.id]: formatCategorySizeOptions(options) }));
+    setCategorySizeSaving(null);
+    setActionMessage(`Tamanhos da categoria ${category.name} atualizados com sucesso.`);
+  }
   async function saveProduct() {
     if (!form.name.trim() || !form.price.trim()) { setActionMessage('Preencha o nome e o preço do produto.'); return; }
     const previousItem = editingProductId ? items.find((item) => item.id === editingProductId) : undefined;
@@ -208,7 +284,8 @@ export default function AdminPage() {
       imageUrl = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
     }
     const imageValue = imageUrl ? serializeImageUrl(imageUrl, form.imageAdjust) : form.image;
-    const sizeRows = form.sizes.map((label) => ({ size: adminSizes.find((option) => option.label === label)?.values[0] ?? 0, quantity: Math.max(0, Number(form.quantities[label] ?? 1)) }));
+    const productSizeOptions = getOptionsForCategory(form.category);
+    const sizeRows = form.sizes.map((label) => ({ size: productSizeOptions.find((option) => option.label === label)?.values[0] ?? 0, quantity: Math.max(0, Number(form.quantities[label] ?? 1)) }));
     if (supabase && session && editingProductId && !editingProductId.startsWith('demo-')) {
       const update = await supabase.from('products').update({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).eq('id', editingProductId);
       if (update.error) { setActionMessage('Não foi possível atualizar o produto.'); return; }
@@ -439,6 +516,11 @@ export default function AdminPage() {
           <form onSubmit={saveCategory} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'end', gap: 12, marginTop: 4 }}><label style={{ display: 'grid', flex: '1 1 240px', gap: 7, color: '#72877d', fontSize: 10, fontWeight: 800 }}>Nova categoria<input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Ex.: Feminino, Masculino ou Infantil" style={{ width: '100%', border: '1px solid #dbe5e0', borderRadius: 8, outline: 0, background: '#fff', color: '#365548', padding: '11px 12px', fontSize: 12 }} /></label><button type="submit" className="new-product-button" disabled={categorySaving} style={{ minHeight: 38 }}>{categorySaving ? 'Salvando...' : 'Adicionar categoria'} <Plus size={16} /></button></form>
           {categoryError && <small className="auth-error">{categoryError}</small>}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginTop: 17 }}>{categories.map((category) => <span key={category.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #d8e8df', borderRadius: 999, background: '#f4faf7', color: '#47715d', padding: '8px 12px', fontSize: 11, fontWeight: 800 }}><Tags size={14} />{category.name}</span>)}</div>
+          <div className="category-size-config-list">
+            <div className="category-size-config-intro"><strong>Tamanhos por categoria</strong><span>Defina as opções que aparecerão no filtro e no cadastro de estoque de cada categoria.</span></div>
+            {categories.map((category) => <form className="category-size-config" key={category.id} onSubmit={(event) => saveCategorySizes(event, category)}><div className="category-size-config-name"><strong>{category.name}</strong><small>Ex.: 41, 42/43, 44/45</small></div><label>Tamanhos disponíveis<input value={categorySizeDrafts[category.id] || ''} onChange={(event) => setCategorySizeDrafts((current) => ({ ...current, [category.id]: event.target.value }))} placeholder="Ex.: 33/34, 35/36, 41/42" /></label><button type="submit" className="secondary-admin-button" disabled={categorySizeSaving === category.id}>{categorySizeSaving === category.id ? 'Salvando...' : 'Salvar tamanhos'} <Check size={15} /></button></form>)}
+            <small className="category-size-config-note">Separe os tamanhos por vírgula. Para usar uma numeração individual, informe apenas um número, como “41”. Alterar esta lista não altera automaticamente o estoque já cadastrado dos produtos.</small>
+          </div>
         </section>
         <section id="pedidos">
           <div className="admin-section-head"><div><span className="admin-kicker">acompanhamento</span><h2>Pedidos enviados</h2></div><span className="admin-breadcrumb">{orders.length} registrados</span></div>
@@ -471,6 +553,6 @@ export default function AdminPage() {
         </section>
       </div></section>
     {previewImage && <div className="admin-image-preview-backdrop" role="presentation" onClick={() => setPreviewImage(null)}><div className="admin-image-preview" role="dialog" aria-modal="true" aria-labelledby="image-preview-title" onClick={(event) => event.stopPropagation()}><div className="admin-form-header"><div><span className="admin-kicker">visualização</span><h2 id="image-preview-title">{previewImage.name}</h2></div><button type="button" onClick={() => setPreviewImage(null)} aria-label="Fechar visualização"><X size={19} /></button></div><div className="admin-image-preview-frame"><img src={previewImage.src} alt={`Foto de ${previewImage.name}`} /></div></div></div>}
-    {showForm && <div className="admin-modal-backdrop" role="presentation" onClick={() => { setShowForm(false); resetProductForm(); }}><div className="admin-form-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title" onClick={(event) => event.stopPropagation()}><div className="admin-form-header"><div><span className="admin-kicker">{editingProductId ? 'edição de produto' : 'novo cadastro'}</span><h2 id="admin-form-title">{editingProductId ? 'Editar produto' : 'Adicionar produto'}</h2></div><button type="button" onClick={() => { setShowForm(false); resetProductForm(); }} aria-label="Fechar"><X size={19} /></button></div><div className="admin-form-body"><label>Nome do produto<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Havaianas Brasil Logo Branco" /></label><div className="admin-form-grid admin-product-fields"><label>Categoria<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select></label><label>Cor<input value={form.color} onChange={(event) => setForm({ ...form, color: event.target.value })} placeholder="Ex.: Branco, Azul ou Preto" /></label><label>Preço<input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="39,90" /></label><label>Etiqueta<select value={form.tag} onChange={(event) => setForm({ ...form, tag: event.target.value })}><option value="">Sem etiqueta</option><option>Mais vendido</option><option>Novidade</option><option>Infantil</option><option>Personalizado</option><option>Conforto</option></select></label></div><label className="admin-inline-field">Status<select value={form.isActive ? 'Ativo' : 'Rascunho'} onChange={(event) => setForm({ ...form, isActive: event.target.value === 'Ativo' })}><option>Ativo</option><option>Rascunho</option></select></label><label>Descrição<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descreva o produto brevemente" rows={3} /></label><label className="upload-field"><span>Imagem principal</span><div className={form.image !== '/products/havaianas-branco.png' ? 'upload-preview' : undefined}>{form.image !== '/products/havaianas-branco.png' ? <><img style={imageAdjustStyle(form.imageAdjust)} src={form.image} alt="Prévia do produto" /><strong>Clique para trocar a foto</strong></> : <><ImagePlus size={18} /><strong>Selecione uma foto do produto</strong><small>PNG ou JPG • imagem quadrada recomendada</small></>}<input type="file" accept="image/png,image/jpeg" onChange={handleImage} /></div></label><fieldset className="image-adjust-fieldset"><div className="image-adjust-heading"><div><legend>Ajuste da imagem</legend><p>Defina o que deve aparecer no card do catálogo.</p></div><button type="button" className="image-adjust-reset" onClick={resetImageAdjust}>Voltar ao centro</button></div><div className="image-adjust-preview"><img style={imageAdjustStyle(form.imageAdjust)} src={form.image} alt="Prévia do enquadramento" /></div><label>Zoom <input type="range" min="0.8" max="1.35" step="0.01" value={form.imageAdjust.zoom} onChange={(event) => setImageAdjust('zoom', event.target.value)} /><output>{Math.round(form.imageAdjust.zoom * 100)}%</output></label><label>Horizontal <input type="range" min="-25" max="25" step="1" value={form.imageAdjust.x} onChange={(event) => setImageAdjust('x', event.target.value)} /><output>{form.imageAdjust.x > 0 ? '+' : ''}{form.imageAdjust.x}%</output></label><label>Vertical <input type="range" min="-25" max="25" step="1" value={form.imageAdjust.y} onChange={(event) => setImageAdjust('y', event.target.value)} /><output>{form.imageAdjust.y > 0 ? '+' : ''}{form.imageAdjust.y}%</output></label></fieldset><fieldset><legend>Estoque por tamanho (pares)</legend><div className="admin-size-grid">{adminSizes.map((option) => <label key={option.label} className={form.sizes.includes(option.label) ? 'admin-size selected' : 'admin-size'}><input type="checkbox" checked={form.sizes.includes(option.label)} onChange={() => toggleSize(option.label)} /><span>{option.label}</span>{form.sizes.includes(option.label) && <input className="size-quantity-input" type="number" min="0" value={form.quantities[option.label] ?? 0} onChange={(event) => setSizeQuantity(option.label, event.target.value)} aria-label={`Quantidade para ${option.label}`} />}</label>)}</div></fieldset></div><div className="admin-form-footer"><button type="button" className="cancel-button" onClick={() => { setShowForm(false); resetProductForm(); }}>Cancelar</button><button type="button" className="new-product-button" onClick={saveProduct}>{editingProductId ? 'Atualizar produto' : 'Salvar produto'} <Check size={16} /></button></div></div></div>}
+    {showForm && <div className="admin-modal-backdrop" role="presentation" onClick={() => { setShowForm(false); resetProductForm(); }}><div className="admin-form-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title" onClick={(event) => event.stopPropagation()}><div className="admin-form-header"><div><span className="admin-kicker">{editingProductId ? 'edição de produto' : 'novo cadastro'}</span><h2 id="admin-form-title">{editingProductId ? 'Editar produto' : 'Adicionar produto'}</h2></div><button type="button" onClick={() => { setShowForm(false); resetProductForm(); }} aria-label="Fechar"><X size={19} /></button></div><div className="admin-form-body"><label>Nome do produto<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Havaianas Brasil Logo Branco" /></label><div className="admin-form-grid admin-product-fields"><label>Categoria<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select></label><label>Cor<input value={form.color} onChange={(event) => setForm({ ...form, color: event.target.value })} placeholder="Ex.: Branco, Azul ou Preto" /></label><label>Preço<input value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="39,90" /></label><label>Etiqueta<select value={form.tag} onChange={(event) => setForm({ ...form, tag: event.target.value })}><option value="">Sem etiqueta</option><option>Mais vendido</option><option>Novidade</option><option>Infantil</option><option>Personalizado</option><option>Conforto</option></select></label></div><label className="admin-inline-field">Status<select value={form.isActive ? 'Ativo' : 'Rascunho'} onChange={(event) => setForm({ ...form, isActive: event.target.value === 'Ativo' })}><option>Ativo</option><option>Rascunho</option></select></label><label>Descrição<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Descreva o produto brevemente" rows={3} /></label><label className="upload-field"><span>Imagem principal</span><div className={form.image !== '/products/havaianas-branco.png' ? 'upload-preview' : undefined}>{form.image !== '/products/havaianas-branco.png' ? <><img style={imageAdjustStyle(form.imageAdjust)} src={form.image} alt="Prévia do produto" /><strong>Clique para trocar a foto</strong></> : <><ImagePlus size={18} /><strong>Selecione uma foto do produto</strong><small>PNG ou JPG • imagem quadrada recomendada</small></>}<input type="file" accept="image/png,image/jpeg" onChange={handleImage} /></div></label><fieldset className="image-adjust-fieldset"><div className="image-adjust-heading"><div><legend>Ajuste da imagem</legend><p>Defina o que deve aparecer no card do catálogo.</p></div><button type="button" className="image-adjust-reset" onClick={resetImageAdjust}>Voltar ao centro</button></div><div className="image-adjust-preview"><img style={imageAdjustStyle(form.imageAdjust)} src={form.image} alt="Prévia do enquadramento" /></div><label>Zoom <input type="range" min="0.8" max="1.35" step="0.01" value={form.imageAdjust.zoom} onChange={(event) => setImageAdjust('zoom', event.target.value)} /><output>{Math.round(form.imageAdjust.zoom * 100)}%</output></label><label>Horizontal <input type="range" min="-25" max="25" step="1" value={form.imageAdjust.x} onChange={(event) => setImageAdjust('x', event.target.value)} /><output>{form.imageAdjust.x > 0 ? '+' : ''}{form.imageAdjust.x}%</output></label><label>Vertical <input type="range" min="-25" max="25" step="1" value={form.imageAdjust.y} onChange={(event) => setImageAdjust('y', event.target.value)} /><output>{form.imageAdjust.y > 0 ? '+' : ''}{form.imageAdjust.y}%</output></label></fieldset><fieldset><legend>Estoque por tamanho (pares)</legend><div className="admin-size-grid">{getOptionsForCategory(form.category).map((option) => <label key={option.label} className={form.sizes.includes(option.label) ? 'admin-size selected' : 'admin-size'}><input type="checkbox" checked={form.sizes.includes(option.label)} onChange={() => toggleSize(option.label)} /><span>{option.label}</span>{form.sizes.includes(option.label) && <input className="size-quantity-input" type="number" min="0" value={form.quantities[option.label] ?? 0} onChange={(event) => setSizeQuantity(option.label, event.target.value)} aria-label={`Quantidade para ${option.label}`} />}</label>)}</div></fieldset></div><div className="admin-form-footer"><button type="button" className="cancel-button" onClick={() => { setShowForm(false); resetProductForm(); }}>Cancelar</button><button type="button" className="new-product-button" onClick={saveProduct}>{editingProductId ? 'Atualizar produto' : 'Salvar produto'} <Check size={16} /></button></div></div></div>}
   </main>;
 }

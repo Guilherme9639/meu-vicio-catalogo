@@ -34,6 +34,7 @@ type Product = {
   image: string;
   imageAdjust?: ImageAdjust;
   sizes: Record<number, number>;
+  sizeOptions?: SizeOption[];
   tag?: string;
 };
 type SizeOption = { label: string; values: number[] };
@@ -95,8 +96,15 @@ const adultSizeOptions = sizeOptions.filter((option) => option.values[0] >= 33);
 const infantSizeOptions = sizeOptions.filter(
   (option) => option.values[0] <= 32,
 );
+function defaultOptionsForCategory(category: string) {
+  if (category === 'Adulto') return adultSizeOptions;
+  if (category === 'Infantil') return infantSizeOptions;
+  return sizeOptions;
+}
 function getAvailableQuantity(product: Product, size: string) {
-  const option = sizeOptions.find((item) => item.label === size);
+  const option = (product.sizeOptions || defaultOptionsForCategory(product.category)).find(
+    (item) => item.label === size,
+  );
   if (!option) return 0;
   return Math.max(
     ...option.values.map((value) => Number(product.sizes[value] ?? 0)),
@@ -421,6 +429,9 @@ export default function Home() {
     'Adulto',
     'Infantil',
   ]);
+  const [categorySizeOptions, setCategorySizeOptions] = useState<
+    Record<string, SizeOption[]>
+  >({ Adulto: adultSizeOptions, Infantil: infantSizeOptions });
   const [catalogLoading, setCatalogLoading] = useState(Boolean(supabase));
   const [settings, setSettings] = useState<StoreSettings>(
     DEFAULT_STORE_SETTINGS,
@@ -470,20 +481,27 @@ export default function Home() {
       delete document.documentElement.dataset.heroSlide;
     };
   }, [heroSlide]);
-  const visibleSizeOptions = useMemo(
-    () =>
-      category === 'Adulto'
-        ? adultSizeOptions
-        : category === 'Infantil'
-          ? infantSizeOptions
-          : sizeOptions,
-    [category],
-  );
+  const visibleSizeOptions = useMemo(() => {
+    if (category !== 'Todos') {
+      return categorySizeOptions[category] || defaultOptionsForCategory(category);
+    }
+    const availableLabels = new Set(
+      catalogProducts.flatMap((product) =>
+        (product.sizeOptions || defaultOptionsForCategory(product.category))
+          .filter((option) =>
+            option.values.some((value) => (product.sizes[value] ?? 0) > 0),
+          )
+          .map((option) => option.label),
+      ),
+    );
+    return sizeOptions.filter((option) => availableLabels.has(option.label));
+  }, [category, categorySizeOptions, catalogProducts]);
   useEffect(() => {
     let mounted = true;
     async function loadCatalog() {
       if (!supabase) return;
-      const [{ data }, { data: categoryRows }] = await Promise.all([
+      const [{ data }, { data: categoryRows }, { data: categorySizeRows }] =
+        await Promise.all([
         supabase
           .from('products')
           .select(
@@ -495,14 +513,50 @@ export default function Home() {
           .from('categories')
           .select('id,name')
           .order('name', { ascending: true }),
+        supabase
+          .from('category_sizes')
+          .select('category_id,size_label,size_values,sort_order')
+          .order('sort_order', { ascending: true }),
       ]);
       if (!mounted) return;
+      const categoryNamesById = new Map(
+        (categoryRows || []).map((row: { id: string; name: string }) => [
+          row.id,
+          row.name,
+        ]),
+      );
+      const customCategoryOptions: Record<string, SizeOption[]> = {};
+      (categorySizeRows || []).forEach(
+        (row: {
+          category_id: string;
+          size_label: string;
+          size_values: number[];
+        }) => {
+          const name = categoryNamesById.get(row.category_id);
+          if (!name) return;
+          const values = Array.isArray(row.size_values)
+            ? row.size_values.map(Number).filter(Number.isFinite)
+            : [];
+          if (!values.length || !row.size_label) return;
+          (customCategoryOptions[name] ||= []).push({
+            label: row.size_label,
+            values,
+          });
+        },
+      );
+      const mergedCategoryOptions: Record<string, SizeOption[]> = {
+        Adulto: adultSizeOptions,
+        Infantil: infantSizeOptions,
+        ...customCategoryOptions,
+      };
+      setCategorySizeOptions(mergedCategoryOptions);
       const nextProducts = (data || []).map((row) => {
         const image = parseImageUrl(row.image_url);
+        const productCategory = String(row.category || 'Adulto');
         return {
           id: row.id,
           name: row.name,
-          category: String(row.category || 'Adulto'),
+          category: productCategory,
           color: row.color || 'Sem cor',
           tag: row.tag || undefined,
           price: Number(row.price),
@@ -517,6 +571,9 @@ export default function Home() {
               ],
             ),
           ),
+          sizeOptions:
+            mergedCategoryOptions[productCategory] ||
+            defaultOptionsForCategory(productCategory),
         };
       });
       setCatalogProducts(nextProducts);
@@ -578,9 +635,9 @@ export default function Home() {
     () =>
       catalogProducts.filter((product) => {
         const term = search.trim().toLowerCase();
-        const selectedOption = sizeOptions.find(
-          (option) => option.label === selectedSize,
-        );
+        const selectedOption = (
+          product.sizeOptions || defaultOptionsForCategory(product.category)
+        ).find((option) => option.label === selectedSize);
         const hasSize =
           !selectedOption ||
           selectedOption.values.some(
@@ -1129,11 +1186,7 @@ export default function Home() {
           <div className="product-grid">
             {filteredProducts.map((product) => {
               const availableSizes = (
-                product.category === 'Adulto'
-                  ? adultSizeOptions
-                  : product.category === 'Infantil'
-                    ? infantSizeOptions
-                    : sizeOptions
+                product.sizeOptions || defaultOptionsForCategory(product.category)
               ).filter((option) =>
                 option.values.some((value) => (product.sizes[value] ?? 0) > 0),
               );
@@ -1345,11 +1398,9 @@ export default function Home() {
               </strong>
               <span className="modal-label">Escolha o tamanho</span>
               <div className="modal-sizes">
-                {(activeProduct.category === 'Adulto'
-                  ? adultSizeOptions
-                  : activeProduct.category === 'Infantil'
-                    ? infantSizeOptions
-                    : sizeOptions
+                {(
+                  activeProduct.sizeOptions ||
+                  defaultOptionsForCategory(activeProduct.category)
                 ).map((option) => {
                   const available = option.values.some(
                     (value) => (activeProduct.sizes[value] ?? 0) > 0,
