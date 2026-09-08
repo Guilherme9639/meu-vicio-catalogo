@@ -606,6 +606,20 @@ a { color: inherit; text-decoration: none; }
 .status.active { background: #fff0f1; color: #c8101e; }
 .loyalty-see-more { border-color: #efbfc3; color: #b4111d; }
 .category-size-config-list { display: grid; gap: 10px; margin-top: 20px; }
+.category-management-list { display: grid; gap: 8px; margin-top: 17px; }
+.category-management-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid #e4e4e4; border-radius: 10px; background: #fff; padding: 10px 12px; }
+.category-management-name { display: flex; min-width: 0; align-items: center; gap: 8px; color: #47715d; }
+.category-management-name strong { color: #3a3a3a; font-size: 12px; }
+.category-management-name small, .category-management-locked { color: #98a7a1; font-size: 10px; font-weight: 700; }
+.category-management-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; }
+.category-management-actions button { min-height: 34px; padding: 8px 10px; }
+.category-delete-button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #efc5c8; border-radius: 7px; background: #fff7f7; color: #b4111d; cursor: pointer; font-size: 11px; font-weight: 800; }
+.category-delete-button:hover { border-color: #e30613; background: #fff0f1; }
+.category-delete-button:disabled { cursor: wait; opacity: .65; }
+.category-management-edit { align-items: end; }
+.category-management-edit label { display: grid; flex: 1 1 220px; gap: 6px; color: #666; font-size: 10px; font-weight: 800; }
+.category-management-edit input { width: 100%; border: 1px solid #dedede; border-radius: 8px; outline: 0; background: #fcfcfc; color: #2d2d2d; padding: 9px 10px; font-size: 12px; }
+.category-management-edit input:focus { border-color: #e30613; box-shadow: 0 0 0 3px rgba(227, 6, 19, .1); }
 .category-size-config-intro { display: grid; gap: 4px; margin-bottom: 2px; }
 .category-size-config-intro strong { color: #303030; font-size: 14px; }
 .category-size-config-intro span, .category-size-config-note { color: #789084; font-size: 11px; line-height: 1.45; }
@@ -663,4 +677,8 @@ a { color: inherit; text-decoration: none; }
   .admin-settings-footer .new-product-button { width: 100%; }
   .category-size-config { grid-template-columns: 1fr; }
   .category-size-config button { width: 100%; }
+  .category-management-row { align-items: stretch; flex-direction: column; }
+  .category-management-name, .category-management-actions { width: 100%; }
+  .category-management-actions button { flex: 1; justify-content: center; }
+  .category-management-edit .category-management-actions { flex-wrap: wrap; }
 }

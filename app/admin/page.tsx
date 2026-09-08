@@ -78,6 +78,9 @@ export default function AdminPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState('');
   const [categorySaving, setCategorySaving] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [categoryActionId, setCategoryActionId] = useState<string | null>(null);
   const [categorySizeOptions, setCategorySizeOptions] = useState<Record<string, SizeOption[]>>({ Adulto: adminAdultSizeOptions, Infantil: adminInfantSizeOptions });
   const [categorySizeDrafts, setCategorySizeDrafts] = useState<Record<string, string>>({});
   const [categorySizeSaving, setCategorySizeSaving] = useState<string | null>(null);
@@ -240,6 +243,110 @@ export default function AdminPage() {
     setNewCategoryName('');
     setForm((current) => ({ ...current, category: name }));
     setCategorySaving(false);
+  }
+  function startCategoryEdit(category: AdminCategory) {
+    if (category.id === 'adulto' || category.id === 'infantil') {
+      setCategoryError('As categorias Adulto e Infantil são padrão e não podem ser renomeadas.');
+      return;
+    }
+    setCategoryError('');
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+  }
+  function cancelCategoryEdit() {
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
+  }
+  async function updateCategory(event: FormEvent, category: AdminCategory) {
+    event.preventDefault();
+    const nextName = editingCategoryName.trim();
+    if (!nextName) {
+      setCategoryError('Informe um nome para a categoria.');
+      return;
+    }
+    if (categories.some((item) => item.id !== category.id && item.name.toLowerCase() === nextName.toLowerCase())) {
+      setCategoryError('Essa categoria já está cadastrada.');
+      return;
+    }
+    setCategoryActionId(category.id);
+    setCategoryError('');
+    if (supabase && session) {
+      const productsResult = await supabase.from('products').update({ category: nextName }).eq('category', category.name);
+      if (productsResult.error) {
+        setCategoryError('Não foi possível atualizar os produtos desta categoria.');
+        setCategoryActionId(null);
+        return;
+      }
+      const categoryResult = await supabase.from('categories').update({ name: nextName }).eq('id', category.id);
+      if (categoryResult.error) {
+        await supabase.from('products').update({ category: category.name }).eq('category', nextName);
+        setCategoryError('Não foi possível atualizar a categoria.');
+        setCategoryActionId(null);
+        return;
+      }
+    }
+    setCategories((current) => current.map((item) => item.id === category.id ? { ...item, name: nextName } : item));
+    setItems((current) => current.map((item) => item.category === category.name ? { ...item, category: nextName } : item));
+    setCategorySizeOptions((current) => {
+      const next = { ...current };
+      if (next[category.name]) {
+        next[nextName] = next[category.name];
+        delete next[category.name];
+      }
+      return next;
+    });
+    setForm((current) => current.category === category.name ? { ...current, category: nextName } : current);
+    setCategorySizeDrafts((current) => ({ ...current, [category.id]: current[category.id] || formatCategorySizeOptions(getOptionsForCategory(category.name)) }));
+    cancelCategoryEdit();
+    setCategoryActionId(null);
+    setActionMessage(`Categoria ${nextName} atualizada com sucesso.`);
+  }
+  async function deleteCategory(category: AdminCategory) {
+    if (category.id === 'adulto' || category.id === 'infantil') {
+      setCategoryError('As categorias Adulto e Infantil são padrão e não podem ser excluídas.');
+      return;
+    }
+    if (!window.confirm(`Excluir a categoria “${category.name}”?`)) return;
+    setCategoryActionId(category.id);
+    setCategoryError('');
+    if (supabase && session) {
+      const { count, error: productsError } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('category', category.name);
+      if (productsError) {
+        setCategoryError('Não foi possível verificar os produtos desta categoria.');
+        setCategoryActionId(null);
+        return;
+      }
+      if ((count || 0) > 0) {
+        setCategoryError(`Não é possível excluir ${category.name} porque existem ${count} produto(s) vinculados. Edite esses produtos primeiro.`);
+        setCategoryActionId(null);
+        return;
+      }
+      const sizesResult = await supabase.from('category_sizes').delete().eq('category_id', category.id);
+      if (sizesResult.error) {
+        setCategoryError('Não foi possível remover as numerações vinculadas.');
+        setCategoryActionId(null);
+        return;
+      }
+      const categoryResult = await supabase.from('categories').delete().eq('id', category.id);
+      if (categoryResult.error) {
+        setCategoryError('Não foi possível excluir a categoria.');
+        setCategoryActionId(null);
+        return;
+      }
+    }
+    setCategories((current) => current.filter((item) => item.id !== category.id));
+    setCategorySizeOptions((current) => {
+      const next = { ...current };
+      delete next[category.name];
+      return next;
+    });
+    setCategorySizeDrafts((current) => {
+      const next = { ...current };
+      delete next[category.id];
+      return next;
+    });
+    setCategoryActionId(null);
+    setActionMessage(`Categoria ${category.name} excluída com sucesso.`);
   }
   function getOptionsForCategory(category: string) {
     return categorySizeOptions[category] || defaultOptionsForCategory(category);
@@ -515,7 +622,9 @@ export default function AdminPage() {
           <div className="admin-section-head"><div><span className="admin-kicker">organização</span><h2>Categorias</h2></div><span className="admin-breadcrumb">{categories.length} cadastradas</span></div>
           <form onSubmit={saveCategory} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'end', gap: 12, marginTop: 4 }}><label style={{ display: 'grid', flex: '1 1 240px', gap: 7, color: '#72877d', fontSize: 10, fontWeight: 800 }}>Nova categoria<input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Ex.: Feminino, Masculino ou Infantil" style={{ width: '100%', border: '1px solid #dbe5e0', borderRadius: 8, outline: 0, background: '#fff', color: '#365548', padding: '11px 12px', fontSize: 12 }} /></label><button type="submit" className="new-product-button" disabled={categorySaving} style={{ minHeight: 38 }}>{categorySaving ? 'Salvando...' : 'Adicionar categoria'} <Plus size={16} /></button></form>
           {categoryError && <small className="auth-error">{categoryError}</small>}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginTop: 17 }}>{categories.map((category) => <span key={category.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #d8e8df', borderRadius: 999, background: '#f4faf7', color: '#47715d', padding: '8px 12px', fontSize: 11, fontWeight: 800 }}><Tags size={14} />{category.name}</span>)}</div>
+          <div className="category-management-list">
+            {categories.map((category) => editingCategoryId === category.id ? <form className="category-management-row category-management-edit" key={category.id} onSubmit={(event) => updateCategory(event, category)}><label><span>Nome da categoria</span><input value={editingCategoryName} onChange={(event) => setEditingCategoryName(event.target.value)} /></label><div className="category-management-actions"><button type="button" className="cancel-button" onClick={cancelCategoryEdit}>Cancelar</button><button type="submit" className="secondary-admin-button" disabled={categoryActionId === category.id}>{categoryActionId === category.id ? 'Salvando...' : 'Salvar'} <Check size={15} /></button></div></form> : <div className="category-management-row" key={category.id}><div className="category-management-name"><Tags size={16} /><strong>{category.name}</strong>{(category.id === 'adulto' || category.id === 'infantil') && <small>Categoria padrão</small>}</div>{category.id === 'adulto' || category.id === 'infantil' ? <small className="category-management-locked">Protegida</small> : <div className="category-management-actions"><button type="button" className="secondary-admin-button" onClick={() => startCategoryEdit(category)}><Pencil size={14} /> Editar</button><button type="button" className="category-delete-button" onClick={() => deleteCategory(category)} disabled={categoryActionId === category.id}><Trash2 size={14} /> {categoryActionId === category.id ? 'Excluindo...' : 'Excluir'}</button></div>}</div>)}
+          </div>
           <div className="category-size-config-list">
             <div className="category-size-config-intro"><strong>Tamanhos por categoria</strong><span>Defina as opções que aparecerão no filtro e no cadastro de estoque de cada categoria.</span></div>
             {categories.map((category) => <form className="category-size-config" key={category.id} onSubmit={(event) => saveCategorySizes(event, category)}><div className="category-size-config-name"><strong>{category.name}</strong><small>Ex.: 41, 42/43, 44/45</small></div><label>Tamanhos disponíveis<input value={categorySizeDrafts[category.id] || ''} onChange={(event) => setCategorySizeDrafts((current) => ({ ...current, [category.id]: event.target.value }))} placeholder="Ex.: 33/34, 35/36, 41/42" /></label><button type="submit" className="secondary-admin-button" disabled={categorySizeSaving === category.id}>{categorySizeSaving === category.id ? 'Salvando...' : 'Salvar tamanhos'} <Check size={15} /></button></form>)}
