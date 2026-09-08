@@ -485,16 +485,21 @@ export default function Home() {
     if (category !== 'Todos') {
       return categorySizeOptions[category] || defaultOptionsForCategory(category);
     }
-    const availableLabels = new Set(
-      catalogProducts.flatMap((product) =>
-        (product.sizeOptions || defaultOptionsForCategory(product.category))
-          .filter((option) =>
-            option.values.some((value) => (product.sizes[value] ?? 0) > 0),
-          )
-          .map((option) => option.label),
-      ),
+    const availableOptions = new Map<string, SizeOption>();
+    catalogProducts.forEach((product) => {
+      (product.sizeOptions || defaultOptionsForCategory(product.category))
+        .filter((option) =>
+          option.values.some((value) => (product.sizes[value] ?? 0) > 0),
+        )
+        .forEach((option) => availableOptions.set(option.label, option));
+    });
+    const standardOptions = sizeOptions.filter((option) =>
+      availableOptions.has(option.label),
     );
-    return sizeOptions.filter((option) => availableLabels.has(option.label));
+    const customOptions = Array.from(availableOptions.values()).filter(
+      (option) => !sizeOptions.some((item) => item.label === option.label),
+    );
+    return [...standardOptions, ...customOptions];
   }, [category, categorySizeOptions, catalogProducts]);
   useEffect(() => {
     let mounted = true;
