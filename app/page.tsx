@@ -777,10 +777,10 @@ export default function Home() {
     },
     {
       id: 'atendimento-2',
-      name: 'Atendimento 2',
+      name: settings.whatsappSecondaryLabel || 'Atendimento 2',
       number: settings.whatsappSecondary,
-      detail: settings.whatsappSecondaryLabel,
-      demo: true,
+      detail: settings.whatsappSecondary,
+      demo: false,
     },
   ];
   return (
@@ -1638,9 +1638,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <small className="contact-demo-note">
-              O segundo atendimento está configurado apenas para demonstração.
-            </small>
           </div>
         </div>
       )}
