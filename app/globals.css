@@ -605,6 +605,16 @@ a { color: inherit; text-decoration: none; }
 .table-sizes span { background: #fff0f1; color: #c8101e; }
 .status.active { background: #fff0f1; color: #c8101e; }
 .loyalty-see-more { border-color: #efbfc3; color: #b4111d; }
+.admin-indicators-section { margin-top: 34px; border-top: 1px solid #e6e6e6; padding-top: 4px; }
+.indicator-filter { display: inline-flex; position: relative; align-items: center; gap: 8px; color: #666; font-size: 10px; font-weight: 800; }
+.indicator-filter select { appearance: none; border: 1px solid #dedede; border-radius: 8px; outline: 0; background: #fcfcfc; color: #2d2d2d; cursor: pointer; padding: 9px 30px 9px 11px; font: inherit; font-size: 11px; }
+.indicator-filter svg { pointer-events: none; position: absolute; right: 9px; bottom: 10px; color: #c8101e; }
+.indicator-card { display: flex; align-items: center; gap: 13px; max-width: 340px; border: 1px solid #e4e4e4; border-radius: 11px; background: #fff; padding: 16px; }
+.indicator-icon { display: inline-flex; height: 40px; width: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border-radius: 10px; background: #fff0f1; color: #e30613; }
+.indicator-card div { display: grid; gap: 3px; }
+.indicator-card small { color: #777; font-size: 10px; font-weight: 800; }
+.indicator-card strong { color: #242424; font-family: Georgia, serif; font-size: 28px; font-weight: 500; line-height: 1; }
+.indicator-card em { color: #98a7a1; font-size: 10px; font-style: normal; }
 .category-size-config-list { display: grid; gap: 10px; margin-top: 20px; }
 .category-management-list { display: grid; gap: 8px; margin-top: 17px; }
 .category-management-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid #e4e4e4; border-radius: 10px; background: #fff; padding: 10px 12px; }
@@ -675,6 +685,10 @@ a { color: inherit; text-decoration: none; }
   .loyalty-management-actions button { flex: 1; justify-content: center; }
   .admin-settings-footer { align-items: stretch; flex-direction: column; }
   .admin-settings-footer .new-product-button { width: 100%; }
+  .indicator-filter { align-items: stretch; flex-direction: column; width: 100%; }
+  .indicator-filter select { width: 100%; }
+  .indicator-filter svg { bottom: 10px; }
+  .indicator-card { max-width: none; }
   .category-size-config { grid-template-columns: 1fr; }
   .category-size-config button { width: 100%; }
   .category-management-row { align-items: stretch; flex-direction: column; }
