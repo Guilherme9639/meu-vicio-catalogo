@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -297,6 +297,23 @@ function StoreHeader({
   showFavoritesOnly: boolean;
   setShowFavoritesOnly: (show: boolean) => void;
 }) {
+  const categoryLinksRef = useRef<HTMLElement | null>(null);
+  const [hasMoreCategories, setHasMoreCategories] = useState(false);
+  useEffect(() => {
+    const updateCategoryOverflow = () => {
+      const element = categoryLinksRef.current;
+      if (!element) return;
+      setHasMoreCategories(
+        element.scrollWidth - element.clientWidth - element.scrollLeft > 8,
+      );
+    };
+    updateCategoryOverflow();
+    window.addEventListener('resize', updateCategoryOverflow);
+    return () => window.removeEventListener('resize', updateCategoryOverflow);
+  }, [categories.length]);
+  function showMoreCategories() {
+    categoryLinksRef.current?.scrollBy({ left: 180, behavior: 'smooth' });
+  }
   return (
     <>
       <div className="announcement-bar">
@@ -383,7 +400,27 @@ function StoreHeader({
               aria-label="Buscar no catálogo"
             />
           </label>
-          <nav className="category-links" aria-label="Categorias">
+          <div
+            className={
+              hasMoreCategories
+                ? 'category-links-shell has-more'
+                : 'category-links-shell'
+            }
+          >
+            <nav
+              ref={categoryLinksRef}
+              className="category-links"
+              aria-label="Categorias"
+              onScroll={() => {
+                const element = categoryLinksRef.current;
+                if (element) {
+                  setHasMoreCategories(
+                    element.scrollWidth - element.clientWidth - element.scrollLeft >
+                      8,
+                  );
+                }
+              }}
+            >
             <a
               className={selectedCategory === 'Todos' ? 'active' : ''}
               href="#colecao"
@@ -411,7 +448,19 @@ function StoreHeader({
             <a className="category-special" href="#como-funciona">
               Personalizados
             </a>
-          </nav>
+            </nav>
+            {hasMoreCategories && (
+              <button
+                className="category-scroll-button"
+                type="button"
+                onClick={showMoreCategories}
+                aria-label="Ver mais categorias"
+                title="Ver mais categorias"
+              >
+                <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </header>
     </>
