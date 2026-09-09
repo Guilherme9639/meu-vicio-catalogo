@@ -425,10 +425,9 @@ export default function Home() {
   const [catalogProducts, setCatalogProducts] = useState<Product[]>(
     supabase ? [] : products,
   );
-  const [catalogCategories, setCatalogCategories] = useState<string[]>([
-    'Adulto',
-    'Infantil',
-  ]);
+  const [catalogCategories, setCatalogCategories] = useState<string[]>(
+    supabase ? [] : ['Adulto', 'Infantil'],
+  );
   const [categorySizeOptions, setCategorySizeOptions] = useState<
     Record<string, SizeOption[]>
   >({ Adulto: adultSizeOptions, Infantil: infantSizeOptions });
@@ -582,19 +581,18 @@ export default function Home() {
         };
       });
       setCatalogProducts(nextProducts);
-      const available = new Set([
-        ...(categoryRows || []).map((row: { name?: string }) =>
-          String(row.name || '').trim(),
-        ),
-        ...nextProducts.map((product) => product.category),
-      ]);
-      setCatalogCategories([
-        'Adulto',
-        'Infantil',
-        ...Array.from(available)
-          .filter((name) => name && name !== 'Adulto' && name !== 'Infantil')
-          .sort((a, b) => a.localeCompare(b)),
-      ]);
+      const available = new Map<string, string>();
+      [...(categoryRows || []).map((row: { name?: string }) =>
+        String(row.name || '').trim(),
+      ), ...nextProducts.map((product) => product.category)].forEach((name) => {
+        const normalizedName = name.toLocaleLowerCase();
+        if (name && !available.has(normalizedName)) {
+          available.set(normalizedName, name);
+        }
+      });
+      setCatalogCategories(
+        Array.from(available.values()).sort((a, b) => a.localeCompare(b)),
+      );
       setCatalogLoading(false);
     }
     loadCatalog();
