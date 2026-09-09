@@ -1,13 +1,13 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_IMAGE_ADJUST, parseImageUrl, serializeImageUrl, type ImageAdjust } from '@/lib/image-adjust';
 
 type SizeOption = { label: string; values: number[] };
-type AdminProduct = { id: string; name: string; category: string; color?: string; tag?: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; sizeQuantities?: Record<string, number>; description?: string; image: string; imageAdjust?: ImageAdjust };
+type AdminProduct = { id: string; name: string; category: string; color?: string; tag?: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; sizeQuantities?: Record<string, number>; description?: string; image: string; imageAdjust?: ImageAdjust; createdAt?: string };
 type AdminCategory = { id: string; name: string };
 type AdminOrder = { id: string; total: number; status: string; stockDeducted: boolean; whatsappNumber: string | null; customerName: string | null; notes: string | null; createdAt: string; items: { productName: string; size: string; quantity: number }[] };
 type StockMovement = { id: string; productName: string; size: string; previousQuantity: number; newQuantity: number; reason: string; createdAt: string };
@@ -126,7 +126,7 @@ export default function AdminPage() {
       const [{ data: categoryRows }, { data: categorySizeRows }, { data: productRows }] = await Promise.all([
         supabase.from('categories').select('id,name').order('name', { ascending: true }),
         supabase.from('category_sizes').select('category_id,size_label,size_values,sort_order').order('sort_order', { ascending: true }),
-        supabase.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,product_sizes(size,quantity)').order('created_at', { ascending: false }),
+        supabase.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,created_at,product_sizes(size,quantity)').order('created_at', { ascending: false }),
       ]);
       if (!mounted) return;
       const nextCategories = (categoryRows || []) as AdminCategory[];
@@ -154,7 +154,7 @@ export default function AdminPage() {
           return [option?.label || String(item.size), item.quantity];
         }));
         const image = parseImageUrl(row.image_url);
-        return { id: row.id, name: row.name, category: categoryName, color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust };
+        return { id: row.id, name: row.name, category: categoryName, color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust, createdAt: row.created_at || '' };
       }));
     }
     async function loadOrders() {
@@ -193,7 +193,15 @@ export default function AdminPage() {
     loadProfile();
     return () => { mounted = false; };
   }, [session]);
-  const visibleItems = useMemo(() => items.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()) && (statusFilter === 'Todos' || item.status === statusFilter)), [items, search, statusFilter]);
+  const visibleItems = useMemo(() => {
+    const categoryOrder = new Map(categories.map((category, index) => [category.name.toLocaleLowerCase(), index]));
+    return items
+      .filter((item) => item.name.toLowerCase().includes(search.toLowerCase()) && (statusFilter === 'Todos' || item.status === statusFilter))
+      .sort((first, second) => {
+        const categoryDifference = (categoryOrder.get(first.category.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER) - (categoryOrder.get(second.category.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER);
+        return categoryDifference || (second.createdAt || '').localeCompare(first.createdAt || '');
+      });
+  }, [items, search, statusFilter, categories]);
   const visibleOrders = useMemo(() => { const term = orderSearch.trim().toLowerCase(); if (!term) return orders; return orders.filter((order) => `${order.id} ${order.whatsappNumber || ''} ${order.customerName || ''} ${order.notes || ''} ${order.items.map((item) => `${item.productName} ${item.size}`).join(' ')}`.toLowerCase().includes(term)); }, [orders, orderSearch]);
   const indicatorOrderCount = indicatorFilter === 'Finalizados' ? orders.filter((order) => order.status === 'Concluído').length : orders.length;
   const visibleLoyaltyCards = useMemo(() => { const term = loyaltySearch.trim().toLowerCase(); if (!term) return loyaltyCards; return loyaltyCards.filter((card) => `${card.customerName} ${card.customerPhone}`.toLowerCase().includes(term)); }, [loyaltyCards, loyaltySearch]);
@@ -217,6 +225,37 @@ export default function AdminPage() {
   function resetProductForm() { setEditingProductId(null); setImageFile(null); setForm({ name: '', category: categories[0]?.name || 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [], quantities: {}, image: '/products/havaianas-branco.png', imageAdjust: DEFAULT_IMAGE_ADJUST }); }
   function openNewProduct() { setActionMessage(''); resetProductForm(); setShowForm(true); }
   function openEditProduct(item: AdminProduct) { setActionMessage(''); setEditingProductId(item.id); setImageFile(null); setForm({ name: item.name, category: item.category, color: item.color || '', tag: item.tag || '', price: item.price.replace('R$', '').trim(), description: item.description || '', isActive: item.status === 'Ativo', sizes: item.sizes, quantities: item.sizeQuantities || Object.fromEntries(item.sizes.map((size) => [size, 1])), image: item.image, imageAdjust: item.imageAdjust || DEFAULT_IMAGE_ADJUST }); setShowForm(true); }
+  async function moveProduct(item: AdminProduct, direction: -1 | 1) {
+    const categoryItems = items
+      .filter((current) => current.category === item.category)
+      .sort((first, second) => (second.createdAt || '').localeCompare(first.createdAt || ''));
+    const currentIndex = categoryItems.findIndex((current) => current.id === item.id);
+    const target = categoryItems[currentIndex + direction];
+    if (!target) return;
+    if (supabase && session && (!item.createdAt || !target.createdAt)) {
+      setActionMessage('Não foi possível alterar a ordem deste produto.');
+      return;
+    }
+    if (supabase && session && !item.id.startsWith('demo-') && !target.id.startsWith('demo-')) {
+      const [itemResult, targetResult] = await Promise.all([
+        supabase.from('products').update({ created_at: target.createdAt }).eq('id', item.id),
+        supabase.from('products').update({ created_at: item.createdAt }).eq('id', target.id),
+      ]);
+      if (itemResult.error || targetResult.error) {
+        setActionMessage('Não foi possível salvar a nova ordem dos produtos.');
+        return;
+      }
+    }
+    setItems((current) => current.map((product) => product.id === item.id ? { ...product, createdAt: target.createdAt } : product.id === target.id ? { ...product, createdAt: item.createdAt } : product));
+    setActionMessage(`${item.name} foi movido ${direction < 0 ? 'para cima' : 'para baixo'} na categoria ${item.category}.`);
+  }
+  function canMoveProduct(item: AdminProduct, direction: -1 | 1) {
+    const categoryItems = items
+      .filter((current) => current.category === item.category)
+      .sort((first, second) => (second.createdAt || '').localeCompare(first.createdAt || ''));
+    const currentIndex = categoryItems.findIndex((current) => current.id === item.id);
+    return Boolean(categoryItems[currentIndex + direction]);
+  }
   function setImageAdjust(field: keyof ImageAdjust, value: string) { setForm((current) => ({ ...current, imageAdjust: { ...current.imageAdjust, [field]: Number(value) } })); }
   function resetImageAdjust() { setForm((current) => ({ ...current, imageAdjust: DEFAULT_IMAGE_ADJUST })); }
   async function logStockChanges(productId: string, productName: string, previousQuantities: Record<string, number>, nextQuantities: Record<string, number>, reason: string) {
@@ -404,16 +443,16 @@ export default function AdminPage() {
       const selectedValues = sizeRows.map((row) => row.size);
       const removeResult = selectedValues.length ? await supabase.from('product_sizes').delete().eq('product_id', editingProductId).not('size', 'in', `(${selectedValues.join(',')})`) : await supabase.from('product_sizes').delete().eq('product_id', editingProductId);
       if (removeResult.error) { setActionMessage('Produto atualizado, mas alguns tamanhos antigos permaneceram.'); return; }
-      const nextItem = { id: editingProductId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust };
+      const nextItem = { id: editingProductId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: previousItem?.createdAt || '' };
       await logStockChanges(editingProductId, form.name.trim(), previousItem?.sizeQuantities || {}, nextItem.sizeQuantities, 'Ajuste manual');
       setItems((current) => current.map((item) => item.id === editingProductId ? nextItem : item));
     } else if (supabase && session) {
-      const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id').single();
+      const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id,created_at').single();
       if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
       const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
       if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
       await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
-      setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust }, ...current]);
+      setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
     } else {
       const localId = editingProductId || String(Date.now());
       const nextItem = { id: localId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes, sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || form.image, imageAdjust: form.imageAdjust };
@@ -621,8 +660,9 @@ export default function AdminPage() {
           <div className="indicator-card"><span className="indicator-icon"><BarChart3 size={20} /></span><div><small>{indicatorFilter === 'Finalizados' ? 'Pedidos realizados' : 'Pedidos registrados'}</small><strong>{indicatorOrderCount}</strong><em>{indicatorFilter === 'Finalizados' ? 'com status Concluído' : 'independentemente do status'}</em></div></div>
         </section>
         <div className="admin-section-head" id="produtos"><div><span className="admin-kicker">catálogo</span><h2>Produtos cadastrados</h2></div><div className="admin-head-actions"><button type="button" className="import-button" onClick={() => setImportNotice(true)}><Upload size={16} /> Orientações da carga</button><button type="button" className="new-product-button" onClick={openNewProduct}><Plus size={17} /> Novo produto</button></div></div>
+        <div className="admin-order-note"><ArrowUp size={15} /><span>Use as setas em cada produto para definir a ordem dentro da categoria. Essa sequência também vale quando o cliente filtrar por tamanho.</span></div>
         <div className="admin-toolbar"><div className="admin-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome do produto" /></div><label className="status-filter"><span>Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'Todos' | 'Ativo' | 'Rascunho')}><option>Todos</option><option>Ativo</option><option>Rascunho</option></select><ChevronDown size={15} /></label></div>
-        <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Cor</th><th>Preço</th><th>Estoque total</th><th>Tamanhos com estoque</th><th>Status</th><th></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}><td><div className="table-product"><button type="button" className="table-product-image-button" onClick={() => setPreviewImage({ src: item.image, name: item.name })} aria-label={`Visualizar foto de ${item.name}`}><img src={item.image} alt="" /></button><strong>{item.name}</strong></div></td><td>{item.category}</td><td>{item.color || 'Não informada'}</td><td className="table-price">{item.price}</td><td><strong>{item.stock}</strong> pares</td><td><div className="table-sizes">{item.sizes.slice(0, 5).map((size) => <span key={size}>{size}</span>)}{item.sizes.length > 5 && <span>+{item.sizes.length - 5}</span>}</div></td><td><span className={item.status === 'Ativo' ? 'status active' : 'status draft'}><i />{item.status}</span></td><td><div className="row-actions"><button className="row-menu" type="button" onClick={() => openEditProduct(item)} aria-label={`Editar ${item.name}`} title="Editar produto"><MoreHorizontal size={18} /></button><button className="row-menu" type="button" onClick={() => toggleProductStatus(item)} aria-label={`${item.status === 'Ativo' ? 'Colocar' : 'Ativar'} ${item.name} como ${item.status === 'Ativo' ? 'rascunho' : 'ativo'}`} title={item.status === 'Ativo' ? 'Colocar como rascunho' : 'Ativar produto'}>{item.status === 'Ativo' ? <EyeOff size={16} /> : <Eye size={16} />}</button><button className="row-menu row-menu-danger" type="button" onClick={() => deleteProduct(item)} aria-label={`Excluir ${item.name}`} title="Excluir produto"><Trash2 size={16} /></button></div></td></tr>)}</tbody></table></div>
+        <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Cor</th><th>Preço</th><th>Estoque total</th><th>Tamanhos com estoque</th><th>Status</th><th></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}><td><div className="table-product"><button type="button" className="table-product-image-button" onClick={() => setPreviewImage({ src: item.image, name: item.name })} aria-label={`Visualizar foto de ${item.name}`}><img src={item.image} alt="" /></button><strong>{item.name}</strong></div></td><td>{item.category}</td><td>{item.color || 'Não informada'}</td><td className="table-price">{item.price}</td><td><strong>{item.stock}</strong> pares</td><td><div className="table-sizes">{item.sizes.slice(0, 5).map((size) => <span key={size}>{size}</span>)}{item.sizes.length > 5 && <span>+{item.sizes.length - 5}</span>}</div></td><td><span className={item.status === 'Ativo' ? 'status active' : 'status draft'}><i />{item.status}</span></td><td><div className="row-actions"><button className="row-menu" type="button" onClick={() => moveProduct(item, -1)} disabled={!canMoveProduct(item, -1)} aria-label={`Mover ${item.name} para cima`} title="Mover para cima"><ArrowUp size={16} /></button><button className="row-menu" type="button" onClick={() => moveProduct(item, 1)} disabled={!canMoveProduct(item, 1)} aria-label={`Mover ${item.name} para baixo`} title="Mover para baixo"><ArrowDown size={16} /></button><button className="row-menu" type="button" onClick={() => openEditProduct(item)} aria-label={`Editar ${item.name}`} title="Editar produto"><MoreHorizontal size={18} /></button><button className="row-menu" type="button" onClick={() => toggleProductStatus(item)} aria-label={`${item.status === 'Ativo' ? 'Colocar' : 'Ativar'} ${item.name} como ${item.status === 'Ativo' ? 'rascunho' : 'ativo'}`} title={item.status === 'Ativo' ? 'Colocar como rascunho' : 'Ativar produto'}>{item.status === 'Ativo' ? <EyeOff size={16} /> : <Eye size={16} />}</button><button className="row-menu row-menu-danger" type="button" onClick={() => deleteProduct(item)} aria-label={`Excluir ${item.name}`} title="Excluir produto"><Trash2 size={16} /></button></div></td></tr>)}</tbody></table></div>
         <div className="admin-help-card"><div className="help-illustration"><ImagePlus size={27} /></div><div><span className="admin-kicker">próximo passo</span><h3>Cadastre os produtos da loja</h3><p>Use o botão de novo produto para adicionar fotos, categorias, preços e estoque separado por tamanho.</p></div><button type="button" className="secondary-admin-button" onClick={openNewProduct}>Cadastrar produto <Plus size={15} /></button></div>
         <section id="categorias" style={{ marginTop: 34, borderTop: '1px solid #e4ece8', paddingTop: 4 }}>
           <div className="admin-section-head"><div><span className="admin-kicker">organização</span><h2>Categorias</h2></div><span className="admin-breadcrumb">{categories.length} cadastradas</span></div>
