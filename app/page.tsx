@@ -854,7 +854,7 @@ export default function Home() {
     if (!cart.length || !validateCartStock()) return;
     const lines = cart.map(
       (item) =>
-        `- ${item.name} | tamanho ${item.selectedSize} | qtd. ${item.quantity} | ${money(item.price * item.quantity)}`,
+        `- ${item.name} | cor ${item.color} | tamanho ${item.selectedSize} | qtd. ${item.quantity} | ${money(item.price * item.quantity)}`,
     );
     const customerLine = customerDetails.name.trim()
       ? `Cliente: ${customerDetails.name.trim()}`
