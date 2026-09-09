@@ -176,7 +176,7 @@ a { color: inherit; text-decoration: none; }
 .how-card p { max-width: 250px; margin: 0; color: #856f62; font-size: 12px; line-height: 1.6; }
 .site-footer { background: #fffaf5; }
 .footer-label { margin: 0 0 4px; color: #a37a6b; font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
-.footer-phone { display: block; margin-bottom: 3px; color: #345e4e; font-family: var(--font-display); font-size: 22px; }
+.footer-phone { display: block; margin-bottom: 3px; border: 0; background: transparent; color: #345e4e; cursor: pointer; padding: 0; font-family: var(--font-display); font-size: 22px; text-align: inherit; }
 .modal-backdrop, .drawer-backdrop { position: fixed; z-index: 60; inset: 0; display: grid; background: rgba(53, 37, 28, .34); backdrop-filter: blur(5px); }
 .modal-backdrop { place-items: center; padding: 20px; }
 .size-modal { position: relative; display: grid; width: min(690px, 100%); grid-template-columns: .8fr 1.2fr; overflow: hidden; border-radius: 23px; background: #fffaf5; box-shadow: 0 24px 70px rgba(49, 32, 24, .22); }

@@ -442,6 +442,9 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cartNotice, setCartNotice] = useState('');
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [contactPickerMode, setContactPickerMode] = useState<
+    'order' | 'consultation'
+  >('order');
   const [customerDetails, setCustomerDetails] = useState({
     name: '',
     notes: '',
@@ -830,6 +833,18 @@ export default function Home() {
     );
     recordOrder(number);
   }
+  function openContactPicker(mode: 'order' | 'consultation') {
+    setContactPickerMode(mode);
+    setContactPickerOpen(true);
+  }
+  function sendConsultationToWhatsApp(number: string) {
+    window.open(
+      `https://wa.me/${number}?text=${encodeURIComponent(
+        'Olá! Gostaria de conhecer os modelos, tamanhos e opções disponíveis.',
+      )}`,
+      '_blank',
+    );
+  }
 
   const whatsappContacts = [
     {
@@ -907,16 +922,11 @@ export default function Home() {
                   <div className="mt-7 flex flex-wrap gap-3">
                     <a
                       className="primary-button"
-                      href={
-                        'https://wa.me/' +
-                        settings.whatsappPrimary +
-                        '?text=' +
-                        encodeURIComponent(
-                          'Olá! Gostaria de saber sobre as Havaianas personalizadas.',
-                        )
-                      }
-                      target="_blank"
-                      rel="noreferrer"
+                      href="#contato"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        openContactPicker('consultation');
+                      }}
                     >
                       Consultar no WhatsApp <MessageCircle size={17} />
                     </a>
@@ -942,9 +952,13 @@ export default function Home() {
                     <a className="primary-button" href="#colecao">
                       Começar a juntar <ArrowRight size={17} />
                     </a>
-                    <a className="secondary-button" href="#contato">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => openContactPicker('consultation')}
+                    >
                       Falar com a loja
-                    </a>
+                    </button>
                   </div>
                 </div>
               )}
@@ -1353,14 +1367,13 @@ export default function Home() {
           </div>
           <div className="text-left sm:text-right">
             <p className="footer-label">Atendimento</p>
-            <a
-              href={`https://wa.me/${settings.whatsappPrimary}`}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => openContactPicker('consultation')}
               className="footer-phone"
             >
               {settings.whatsappPrimary}
-            </a>
+            </button>
             <p className="text-xs text-[#9e897a]">{settings.hours}</p>
           </div>
         </div>
@@ -1606,7 +1619,7 @@ export default function Home() {
                   className="whatsapp-button"
                   type="button"
                   onClick={() => {
-                    if (validateCartStock()) setContactPickerOpen(true);
+                    if (validateCartStock()) openContactPicker('order');
                   }}
                 >
                   Enviar pedido pelo WhatsApp <ArrowRight size={17} />
@@ -1668,10 +1681,15 @@ export default function Home() {
               <X size={19} />
             </button>
             <span className="eyebrow warm">escolha o atendimento</span>
-            <h2 id="contact-modal-title">Para quem você quer enviar?</h2>
+            <h2 id="contact-modal-title">
+              {contactPickerMode === 'order'
+                ? 'Para quem você quer enviar?'
+                : 'Fale com a loja'}
+            </h2>
             <p>
-              O pedido será enviado com os produtos, tamanhos e quantidades
-              escolhidos.
+              {contactPickerMode === 'order'
+                ? 'O pedido será enviado com os produtos, tamanhos e quantidades escolhidos.'
+                : 'Escolha um atendimento para tirar dúvidas e consultar modelos, tamanhos e opções.'}
             </p>
             <div className="contact-options">
               {whatsappContacts.map((contact) => (
@@ -1681,8 +1699,12 @@ export default function Home() {
                   key={contact.id}
                   onClick={() => {
                     setContactPickerOpen(false);
-                    setCartOpen(false);
-                    sendToWhatsApp(contact.number);
+                    if (contactPickerMode === 'order') {
+                      setCartOpen(false);
+                      sendToWhatsApp(contact.number);
+                    } else {
+                      sendConsultationToWhatsApp(contact.number);
+                    }
                   }}
                 >
                   <span className="contact-option-icon">
