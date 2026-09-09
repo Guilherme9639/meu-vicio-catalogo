@@ -101,6 +101,10 @@ function defaultOptionsForCategory(category: string) {
   if (category === 'Infantil') return infantSizeOptions;
   return sizeOptions;
 }
+function productCategoryLabel(category: string) {
+  const name = category.trim();
+  return /^havaianas\b/i.test(name) ? name : `Havaianas ${name}`;
+}
 function getAvailableQuantity(product: Product, size: string) {
   const option = (product.sizeOptions || defaultOptionsForCategory(product.category)).find(
     (item) => item.label === size,
@@ -1238,7 +1242,7 @@ export default function Home() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className="product-category">
-                          Havaianas {product.category.toLowerCase()}{' '}
+                          {productCategoryLabel(product.category)}{' '}
                           <span>•</span> {product.color}
                         </span>
                         <h3>{product.name}</h3>
@@ -1391,7 +1395,7 @@ export default function Home() {
             </div>
             <div className="modal-content">
               <span className="product-category">
-                Havaianas {activeProduct.category.toLowerCase()} •{' '}
+                {productCategoryLabel(activeProduct.category)} •{' '}
                 {activeProduct.color}
               </span>
               <h2 id="size-modal-title">{activeProduct.name}</h2>
@@ -1459,7 +1463,7 @@ export default function Home() {
             </div>
             <div className="full-image-caption">
               <span className="product-category">
-                Havaianas {imagePreviewProduct.category.toLowerCase()} •{' '}
+                {productCategoryLabel(imagePreviewProduct.category)} •{' '}
                 {imagePreviewProduct.color}
               </span>
               <h2 id="full-image-title">{imagePreviewProduct.name}</h2>
