@@ -1524,7 +1524,10 @@ export default function Home() {
                       <div className="min-w-0 flex-1">
                         <h3>{item.name}</h3>
                         <p>
-                          Tamanho {item.selectedSize} • {money(item.price)}
+                          Tamanho {item.selectedSize} •{' '}
+                          <span className="drawer-unit-price">
+                            {money(item.price)}
+                          </span>
                         </p>
                         <div className="quantity-control">
                           <button
