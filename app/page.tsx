@@ -691,27 +691,38 @@ export default function Home() {
       setSelectedSize(null);
   }, [selectedSize, visibleSizeOptions]);
   const filteredProducts = useMemo(
-    () =>
-      catalogProducts.filter((product) => {
-        const term = search.trim().toLowerCase();
-        const selectedOption = (
-          product.sizeOptions || defaultOptionsForCategory(product.category)
-        ).find((option) => option.label === selectedSize);
-        const hasSize =
-          !selectedOption ||
-          selectedOption.values.some(
-            (value) => (product.sizes[value] ?? 0) > 0,
+    () => {
+      const categoryOrder = new Map(
+        catalogCategories.map((name, index) => [name.toLocaleLowerCase(), index]),
+      );
+      return catalogProducts
+        .filter((product) => {
+          const term = search.trim().toLowerCase();
+          const selectedOption = (
+            product.sizeOptions || defaultOptionsForCategory(product.category)
+          ).find((option) => option.label === selectedSize);
+          const hasSize =
+            !selectedOption ||
+            selectedOption.values.some(
+              (value) => (product.sizes[value] ?? 0) > 0,
+            );
+          return (
+            (category === 'Todos' || product.category === category) &&
+            hasSize &&
+            (!term ||
+              `${product.name} ${product.color}`.toLowerCase().includes(term)) &&
+            (!showFavoritesOnly || favorites.includes(product.id))
           );
-        return (
-          (category === 'Todos' || product.category === category) &&
-          hasSize &&
-          (!term ||
-            `${product.name} ${product.color}`.toLowerCase().includes(term)) &&
-          (!showFavoritesOnly || favorites.includes(product.id))
+        })
+        .sort(
+          (first, second) =>
+            (categoryOrder.get(first.category.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER) -
+            (categoryOrder.get(second.category.toLocaleLowerCase()) ?? Number.MAX_SAFE_INTEGER),
         );
-      }),
+    },
     [
       catalogProducts,
+      catalogCategories,
       category,
       search,
       selectedSize,
