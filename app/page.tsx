@@ -312,7 +312,9 @@ function StoreHeader({
     return () => window.removeEventListener('resize', updateCategoryOverflow);
   }, [categories.length]);
   function showMoreCategories() {
-    categoryLinksRef.current?.scrollBy({ left: 180, behavior: 'smooth' });
+    const element = categoryLinksRef.current;
+    if (!element) return;
+    element.scrollTo({ left: element.scrollWidth, behavior: 'smooth' });
   }
   return (
     <>
@@ -454,8 +456,8 @@ function StoreHeader({
                 className="category-scroll-button"
                 type="button"
                 onClick={showMoreCategories}
-                aria-label="Ver mais categorias"
-                title="Ver mais categorias"
+                aria-label="Ir para o final das categorias"
+                title="Ir para o final das categorias"
               >
                 <ArrowRight size={16} />
               </button>
