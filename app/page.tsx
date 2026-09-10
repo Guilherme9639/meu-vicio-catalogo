@@ -252,7 +252,7 @@ function Brand({ storeName = 'Meu Vício' }: { storeName?: string }) {
   return (
     <a
       href="#inicio"
-      className="flex items-center gap-3"
+      className="site-brand flex items-center gap-3"
       aria-label={`${storeName} - início`}
     >
       <span className="brand-mark">mv</span>
@@ -386,7 +386,7 @@ function StoreHeader({
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="header-actions flex items-center gap-2">
             <button
               className={
                 showFavoritesOnly
