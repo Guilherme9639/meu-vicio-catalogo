@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
+import { Activity, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_IMAGE_ADJUST, parseImageUrl, serializeImageUrl, type ImageAdjust } from '@/lib/image-adjust';
@@ -13,6 +13,7 @@ type AdminOrder = { id: string; total: number; status: string; stockDeducted: bo
 type StockMovement = { id: string; productName: string; size: string; previousQuantity: number; newQuantity: number; reason: string; createdAt: string };
 type AdminSettings = { storeName: string; hours: string; whatsappPrimary: string; whatsappPrimaryLabel: string; whatsappSecondary: string; whatsappSecondaryLabel: string; whatsappMessage: string };
 type AdminProfile = { fullName: string };
+type AdminLog = { id: string; action: string; entityType: string; entityId: string | null; description: string; createdAt: string; userName: string };
 type LoyaltyPurchase = { id: string; purchaseDate: string };
 type LoyaltyCard = { id: string; customerName: string; customerPhone: string; purchases: LoyaltyPurchase[] };
 const defaultSettings: AdminSettings = { storeName: 'Meu Vício', hours: 'Segunda a sábado • 9h às 18h', whatsappPrimary: '5531994483976', whatsappPrimaryLabel: 'Atendimento principal', whatsappSecondary: '5531999999999', whatsappSecondaryLabel: 'Número de demonstração', whatsappMessage: 'Olá! Vim pelo catálogo Meu Vício e gostaria de fazer um pedido.' };
@@ -106,6 +107,9 @@ export default function AdminPage() {
   const [profile, setProfile] = useState<AdminProfile>({ fullName: '' });
   const [profilePassword, setProfilePassword] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<AdminLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
   const [form, setForm] = useState({ name: '', category: 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [] as string[], quantities: {} as Record<string, number>, image: '/products/havaianas-branco.png', imageAdjust: DEFAULT_IMAGE_ADJUST });
   useEffect(() => {
     if (!supabase) { setLoading(false); return; }
@@ -192,12 +196,19 @@ export default function AdminPage() {
       const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Administrador';
       setProfile({ fullName: data?.full_name || fallbackName });
     }
+    async function loadActivityLogs() {
+      setLogsLoading(true);
+      const { data } = await supabase.from('activity_logs').select('id,action,entity_type,entity_id,description,created_at,profiles:changed_by(full_name)').order('created_at', { ascending: false }).limit(100);
+      if (mounted && data) setActivityLogs(data.map((row: { id: string; action: string; entity_type: string; entity_id: string | null; description: string; created_at: string; profiles?: { full_name?: string | null } | null }) => ({ id: row.id, action: row.action, entityType: row.entity_type, entityId: row.entity_id, description: row.description, createdAt: row.created_at, userName: row.profiles?.full_name || 'Administrador' })));
+      if (mounted) setLogsLoading(false);
+    }
     loadCatalog();
     loadOrders();
     loadStockMovements();
     loadLoyaltyCards();
     loadSettings();
     loadProfile();
+    loadActivityLogs();
     return () => { mounted = false; };
   }, [session]);
   const visibleItems = useMemo(() => {
@@ -213,6 +224,7 @@ export default function AdminPage() {
   const indicatorOrderCount = indicatorFilter === 'Finalizados' ? orders.filter((order) => order.status === 'Concluído').length : orders.length;
   const visibleLoyaltyCards = useMemo(() => { const term = loyaltySearch.trim().toLowerCase(); if (!term) return loyaltyCards; return loyaltyCards.filter((card) => `${card.customerName} ${card.customerPhone}`.toLowerCase().includes(term)); }, [loyaltyCards, loyaltySearch]);
   const displayedLoyaltyCards = useMemo(() => showAllLoyaltyCards || loyaltySearch.trim() ? visibleLoyaltyCards : visibleLoyaltyCards.slice(0, 2), [loyaltySearch, showAllLoyaltyCards, visibleLoyaltyCards]);
+  const visibleLogs = useMemo(() => { const term = logSearch.trim().toLowerCase(); if (!term) return activityLogs; return activityLogs.filter((log) => `${log.action} ${log.entityType} ${log.description} ${log.userName} ${log.entityId || ''}`.toLowerCase().includes(term)); }, [activityLogs, logSearch]);
   const hiddenLoyaltyCardCount = Math.max(0, visibleLoyaltyCards.length - 2);
   const summary = useMemo(() => {
     return {
@@ -225,6 +237,11 @@ export default function AdminPage() {
   }, [items, categories]);
   async function signIn(event: FormEvent) { event.preventDefault(); if (!supabase) return; setAuthLoading(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword(authForm); if (error) setAuthError('Não foi possível entrar. Confira seu e-mail e senha.'); setAuthLoading(false); }
   async function signOut() { if (supabase) await supabase.auth.signOut(); }
+  async function createActivityLog(action: string, entityType: string, description: string, entityId?: string | null, details?: Record<string, unknown>) {
+    if (!supabase || !session) return;
+    const { data } = await supabase.from('activity_logs').insert({ action, entity_type: entityType, entity_id: entityId || null, description, details: details || {}, changed_by: session.user.id }).select('id,action,entity_type,entity_id,description,created_at').single();
+    if (data) setActivityLogs((current) => [{ id: data.id, action: data.action, entityType: data.entity_type, entityId: data.entity_id, description: data.description, createdAt: data.created_at, userName: profile.fullName || fallbackProfileName }, ...current].slice(0, 100));
+  }
   function handleImage(event: ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const previewUrl = URL.createObjectURL(file); setImageFile(file); setForm((current) => ({ ...current, image: previewUrl, imageAdjust: DEFAULT_IMAGE_ADJUST })); }
   function parsePrice(value: string) { const normalized = value.replace(/[^\d,.-]/g, ''); return Number(normalized.includes(',') ? normalized.replace(/\./g, '').replace(',', '.') : normalized) || 0; }
   function toggleSize(size: string) { setForm((current) => { const selected = current.sizes.includes(size); const quantities = { ...current.quantities }; if (selected) delete quantities[size]; else quantities[size] = 1; return { ...current, sizes: selected ? current.sizes.filter((item) => item !== size) : [...current.sizes, size], quantities }; }); }
@@ -290,6 +307,7 @@ export default function AdminPage() {
     }
     setNewCategoryName('');
     setForm((current) => ({ ...current, category: name }));
+    void createActivityLog('Criação', 'Categoria', `Categoria ${name} criada.`, undefined, { categoryName: name });
     setCategorySaving(false);
   }
   function startCategoryEdit(category: AdminCategory) {
@@ -348,6 +366,7 @@ export default function AdminPage() {
     cancelCategoryEdit();
     setCategoryActionId(null);
     setActionMessage(`Categoria ${nextName} atualizada com sucesso.`);
+    void createActivityLog('Edição', 'Categoria', `Categoria alterada de ${category.name} para ${nextName}.`, category.id, { previousName: category.name, newName: nextName });
   }
   async function deleteCategory(category: AdminCategory) {
     if (category.id === 'adulto' || category.id === 'infantil') {
@@ -395,6 +414,7 @@ export default function AdminPage() {
     });
     setCategoryActionId(null);
     setActionMessage(`Categoria ${category.name} excluída com sucesso.`);
+    void createActivityLog('Exclusão', 'Categoria', `Categoria ${category.name} excluída.`, category.id);
   }
   function getOptionsForCategory(category: string) {
     return categorySizeOptions[category] || defaultOptionsForCategory(category);
@@ -426,6 +446,7 @@ export default function AdminPage() {
     setCategorySizeDrafts((current) => ({ ...current, [category.id]: formatCategorySizeOptions(options) }));
     setCategorySizeSaving(null);
     setActionMessage(`Tamanhos da categoria ${category.name} atualizados com sucesso.`);
+    void createActivityLog('Edição', 'Categoria', `Numerações da categoria ${category.name} atualizadas.`, category.id, { sizes: options.map((option) => option.label) });
   }
   async function saveProduct() {
     if (!form.name.trim() || !form.price.trim()) { setActionMessage('Preencha o nome e o preço do produto.'); return; }
@@ -465,6 +486,7 @@ export default function AdminPage() {
       const nextItem = { id: localId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes, sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || form.image, imageAdjust: form.imageAdjust };
       setItems((current) => editingProductId ? current.map((item) => item.id === editingProductId ? nextItem : item) : [nextItem, ...current]);
     }
+    void createActivityLog(editingProductId ? 'Edição' : 'Criação', 'Produto', `${editingProductId ? 'Produto atualizado' : 'Produto cadastrado'}: ${form.name.trim()}.`, editingProductId, { category: form.category, color: form.color.trim(), price: numericPrice });
     setActionMessage(editingProductId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.');
     resetProductForm();
     setShowForm(false);
@@ -496,6 +518,7 @@ export default function AdminPage() {
     }
     setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: order.stockDeducted || shouldDeductStock } : order));
     setActionMessage(shouldDeductStock ? 'Pedido confirmado e estoque atualizado.' : 'Status do pedido atualizado.');
+    void createActivityLog('Edição', 'Pedido', `Status do pedido alterado para ${status}.`, id, { status, stockDeducted: shouldDeductStock });
   }
   async function deleteOrder(order: AdminOrder) {
     if (!supabase || !session) return;
@@ -508,6 +531,7 @@ export default function AdminPage() {
     if (orderResult.error) { setActionMessage('Não foi possível excluir o pedido.'); return; }
     setOrders((current) => current.filter((item) => item.id !== order.id));
     setActionMessage('Pedido excluído com sucesso.');
+    void createActivityLog('Exclusão', 'Pedido', `Pedido #${order.id.slice(0, 8).toUpperCase()} excluído.`, order.id, { total: order.total });
   }
   function exportOrders() {
     const escapeCell = (value: string | number | null) => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -561,6 +585,7 @@ export default function AdminPage() {
     }
     setItems((current) => current.map((product) => product.id === item.id ? { ...product, status: nextStatus } : product));
     setActionMessage(`Produto ${nextStatus === 'Ativo' ? 'ativado' : 'colocado como rascunho'} com sucesso.`);
+    void createActivityLog('Edição', 'Produto', `${item.name} foi ${nextStatus === 'Ativo' ? 'ativado' : 'colocado como rascunho'}.`, item.id, { status: nextStatus });
   }
   async function deleteProduct(item: AdminProduct) {
     if (!window.confirm(`Excluir o produto “${item.name}”? Essa ação remove o cadastro e os tamanhos vinculados.`)) return;
@@ -575,6 +600,7 @@ export default function AdminPage() {
     }
     setItems((current) => current.filter((product) => product.id !== item.id));
     setActionMessage('Produto excluído com segurança.');
+    void createActivityLog('Exclusão', 'Produto', `Produto ${item.name} excluído.`, item.id);
   }
   async function saveSettings(event: FormEvent) {
     event.preventDefault();
@@ -583,6 +609,7 @@ export default function AdminPage() {
     const { error } = await supabase.from('store_settings').upsert({ id: 'default', store_name: settings.storeName.trim() || 'Meu Vício', hours: settings.hours.trim(), whatsapp_primary: settings.whatsappPrimary.replace(/\D/g, ''), whatsapp_primary_label: settings.whatsappPrimaryLabel.trim() || 'Atendimento principal', whatsapp_secondary: settings.whatsappSecondary.replace(/\D/g, ''), whatsapp_secondary_label: settings.whatsappSecondaryLabel.trim(), whatsapp_message: settings.whatsappMessage.trim() }, { onConflict: 'id' });
     if (error) setActionMessage('Não foi possível salvar as preferências.');
     else setActionMessage('Preferências atualizadas com sucesso.');
+    if (!error) void createActivityLog('Edição', 'Preferências', 'Preferências do catálogo atualizadas.');
     setSettingsSaving(false);
   }
   async function addLoyaltyCard(event: FormEvent) {
@@ -596,6 +623,7 @@ export default function AdminPage() {
     setLoyaltyCards((current) => [{ id: data.id, customerName: data.customer_name, customerPhone: data.customer_phone || '', purchases: [] }, ...current]);
     setLoyaltyForm({ customerName: '', customerPhone: '' });
     setActionMessage('Cartela cadastrada com sucesso.');
+    void createActivityLog('Criação', 'Fidelidade', `Cartela de ${customerName} cadastrada.`, data.id, { customerPhone: data.customer_phone || '' });
     setLoyaltySaving(false);
   }
   async function startLoyaltyEdit(card: LoyaltyCard) {
@@ -611,6 +639,7 @@ export default function AdminPage() {
     if (error) { setActionMessage('Não foi possível atualizar a cartela.'); return; }
     setLoyaltyCards((current) => current.map((item) => item.id === card.id ? { ...item, customerName: trimmedName, customerPhone: normalizedPhone } : item));
     setActionMessage('Cartela atualizada com sucesso.');
+    void createActivityLog('Edição', 'Fidelidade', `Cartela de ${trimmedName} atualizada.`, card.id);
   }
   async function deleteLoyaltyCard(card: LoyaltyCard) {
     if (!supabase || !session) return;
@@ -619,6 +648,7 @@ export default function AdminPage() {
     if (error) { setActionMessage('Não foi possível excluir a cartela.'); return; }
     setLoyaltyCards((current) => current.filter((item) => item.id !== card.id));
     setActionMessage('Cartela excluída com sucesso.');
+    void createActivityLog('Exclusão', 'Fidelidade', `Cartela de ${card.customerName} excluída.`, card.id);
   }
   async function markLoyaltyPurchase(card: LoyaltyCard) {
     if (!supabase || !session) return;
@@ -630,6 +660,7 @@ export default function AdminPage() {
     setLoyaltyCards((current) => current.map((item) => item.id === card.id ? { ...item, purchases: [...item.purchases, purchase] } : item));
     setPurchaseDates((current) => ({ ...current, [card.id]: '' }));
     setActionMessage(`${card.customerName}: compra ${card.purchases.length + 1} de 10 registrada.`);
+    void createActivityLog('Criação', 'Fidelidade', `Compra ${card.purchases.length + 1} de 10 registrada para ${card.customerName}.`, card.id, { purchaseDate });
   }
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
@@ -646,6 +677,7 @@ export default function AdminPage() {
     if (authResult.error) { setActionMessage('Perfil salvo, mas não foi possível atualizar a senha.'); setProfileSaving(false); return; }
     setProfilePassword('');
     setActionMessage('Perfil atualizado com sucesso.');
+    void createActivityLog('Edição', 'Perfil', `Perfil de ${fullName} atualizado.`, session.user.id, { fullName });
     setProfileSaving(false);
   }
 
@@ -658,8 +690,8 @@ export default function AdminPage() {
   if (supabase && !session) return <main className="admin-auth-shell"><form className="admin-auth-card" onSubmit={signIn}><span className="admin-brand-mark">mv</span><span className="admin-kicker">acesso restrito</span><h1>Painel da loja</h1><p>Entre com o usuário administrador do Supabase para gerenciar produtos e estoque.</p><label>E-mail<input type="email" required value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} placeholder="seu@email.com" /></label><label>Senha<input type="password" required value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} placeholder="Sua senha" /></label>{authError && <small className="auth-error">{authError}</small>}<button type="submit" className="new-product-button" disabled={authLoading}>{authLoading ? 'Entrando...' : 'Entrar no painel'}</button><a href="/" className="auth-back-link">Voltar ao catálogo</a></form></main>;
 
   return <main className="admin-shell">
-<aside className="admin-sidebar"><a href="/" className="admin-brand"><span className="admin-brand-mark">mv</span><span><strong>MEU VÍCIO</strong><small>painel da loja</small></span></a><div className="admin-menu-label">menu principal</div><nav className="admin-menu"><a className="active" href="#visao-geral"><LayoutDashboard size={17} /> Visão geral</a><a href="#indicadores"><BarChart3 size={17} /> Indicadores</a><a href="#produtos"><Package size={17} /> Produtos <span>{items.length}</span></a><a href="#categorias"><Tags size={17} /> Categorias</a><a href="#pedidos"><ShoppingBag size={17} /> Pedidos <span>{orders.length}</span></a><a href="#fidelidade"><Heart size={17} /> Fidelidade</a></nav><div className="admin-menu-label settings-label">configurações</div><nav className="admin-menu"><a href="#configuracoes"><Settings2 size={17} /> Preferências</a><a href="#perfil"><Settings2 size={17} /> Perfil</a></nav><div className="admin-sidebar-bottom"><div className="admin-user-avatar">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>Administrador</span></div><button type="button" onClick={signOut} aria-label="Sair do painel" title="Sair do painel" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', border: 0, background: 'transparent', color: '#7d9288', cursor: 'pointer', padding: '6px 3px', font: 'inherit' }}><LogOut size={16} /><span style={{ marginTop: 0, color: 'currentColor', fontSize: 10, fontWeight: 800 }}>Sair</span></button></div></aside>
-<section className="admin-content"><header className="admin-topbar"><div><span className="admin-breadcrumb">Painel / Visão geral</span><h1>{greeting}, {displayName} <span>✦</span></h1></div><div className="admin-top-actions"><button type="button" aria-label="Notificações indisponíveis" title="Notificações em breve" disabled><Bell size={19} /></button><a className="view-store" href="/" target="_blank" rel="noreferrer">Ver catálogo <ArrowLeft size={15} /></a></div></header><nav className="admin-mobile-nav" aria-label="Seções do painel"><a href="#visao-geral">Visão geral</a><a href="#indicadores">Indicadores</a><a href="#produtos">Produtos</a><a href="#categorias">Categorias</a><a href="#fidelidade">Fidelidade</a><a href="#pedidos">Pedidos</a><a href="#configuracoes">Preferências</a></nav>
+<aside className="admin-sidebar"><a href="/" className="admin-brand"><span className="admin-brand-mark">mv</span><span><strong>MEU VÍCIO</strong><small>painel da loja</small></span></a><div className="admin-menu-label">menu principal</div><nav className="admin-menu"><a className="active" href="#visao-geral"><LayoutDashboard size={17} /> Visão geral</a><a href="#indicadores"><BarChart3 size={17} /> Indicadores</a><a href="#produtos"><Package size={17} /> Produtos <span>{items.length}</span></a><a href="#categorias"><Tags size={17} /> Categorias</a><a href="#pedidos"><ShoppingBag size={17} /> Pedidos <span>{orders.length}</span></a><a href="#fidelidade"><Heart size={17} /> Fidelidade</a></nav><div className="admin-menu-label settings-label">configurações</div><nav className="admin-menu"><a href="#configuracoes"><Settings2 size={17} /> Preferências</a><a href="#perfil"><Settings2 size={17} /> Perfil</a><a href="#logs"><Activity size={17} /> Logs</a></nav><div className="admin-sidebar-bottom"><div className="admin-user-avatar">{displayName.slice(0, 2).toUpperCase()}</div><div><strong>{displayName}</strong><span>Administrador</span></div><button type="button" onClick={signOut} aria-label="Sair do painel" title="Sair do painel" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 'auto', border: 0, background: 'transparent', color: '#7d9288', cursor: 'pointer', padding: '6px 3px', font: 'inherit' }}><LogOut size={16} /><span style={{ marginTop: 0, color: 'currentColor', fontSize: 10, fontWeight: 800 }}>Sair</span></button></div></aside>
+<section className="admin-content"><header className="admin-topbar"><div><span className="admin-breadcrumb">Painel / Visão geral</span><h1>{greeting}, {displayName} <span>✦</span></h1></div><div className="admin-top-actions"><button type="button" aria-label="Notificações indisponíveis" title="Notificações em breve" disabled><Bell size={19} /></button><a className="view-store" href="/" target="_blank" rel="noreferrer">Ver catálogo <ArrowLeft size={15} /></a></div></header><nav className="admin-mobile-nav" aria-label="Seções do painel"><a href="#visao-geral">Visão geral</a><a href="#indicadores">Indicadores</a><a href="#produtos">Produtos</a><a href="#categorias">Categorias</a><a href="#fidelidade">Fidelidade</a><a href="#pedidos">Pedidos</a><a href="#configuracoes">Preferências</a><a href="#logs">Logs</a></nav>
       <div className="admin-main" id="visao-geral">{actionMessage && <div className="admin-action-message" role="status"><Check size={16} /> <span>{actionMessage}</span><button type="button" onClick={() => setActionMessage('')} aria-label="Fechar mensagem"><X size={16} /></button></div>}{importNotice && <div className="import-notice"><div><span className="notice-icon"><Check size={16} /></span><div><strong>Drive usado somente para a primeira carga</strong><p>Depois da importação, novos produtos, fotos e estoques serão atualizados diretamente neste painel.</p></div></div><button type="button" onClick={() => setImportNotice(false)} aria-label="Fechar aviso"><X size={17} /></button></div>}
         <div className="admin-stats"><div className="stat-card accent"><span className="stat-icon"><Package size={18} /></span><div><small>Produtos ativos</small><strong>{summary.activeProducts.toString().padStart(2, '0')}</strong><em>{items.length} cadastrados no total</em></div></div><div className="stat-card"><span className="stat-icon green"><ShoppingBag size={18} /></span><div><small>Pares em estoque</small><strong>{summary.stockTotal}</strong><em>somatório das quantidades</em></div></div><div className="stat-card"><span className="stat-icon sand"><Tags size={18} /></span><div><small>Categorias</small><strong>{summary.categoryCount.toString().padStart(2, '0')}</strong><em>{summary.categoryLabel}</em></div></div><div className="stat-card"><span className="stat-icon lilac"><ImagePlus size={18} /></span><div><small>Imagens cadastradas</small><strong>{summary.imageCount.toString().padStart(2, '0')}</strong><em>imagens vinculadas</em></div></div></div>
         <section id="indicadores" className="admin-indicators-section">
@@ -710,6 +742,12 @@ export default function AdminPage() {
             <div className="admin-section-head"><div><span className="admin-kicker">conta</span><h2>Meu perfil</h2></div><span className="admin-breadcrumb">acesso atual</span></div>
             <form className="admin-settings-form" onSubmit={saveProfile}><div className="admin-profile-grid"><label className="admin-settings-card"><span>Nome de exibição</span><input value={profile.fullName} onChange={(event) => setProfile({ ...profile, fullName: event.target.value })} placeholder={fallbackProfileName} /></label><label className="admin-settings-card"><span>E-mail de acesso</span><input value={session?.user.email || ''} readOnly /></label><label className="admin-settings-card"><span>Nova senha (opcional)</span><input type="password" value={profilePassword} onChange={(event) => setProfilePassword(event.target.value)} placeholder="Mínimo de 6 caracteres" /></label></div><div className="admin-settings-footer"><small>O nome aparece na saudação e no usuário do painel. O e-mail de acesso permanece protegido.</small><button type="submit" className="new-product-button" disabled={profileSaving}>{profileSaving ? 'Salvando...' : 'Salvar perfil'} <Check size={16} /></button></div></form>
           </div>
+          <section id="logs" className="admin-logs-section">
+            <div className="admin-section-head"><div><span className="admin-kicker">auditoria</span><h2>Logs do painel</h2></div><span className="admin-breadcrumb">{activityLogs.length} registros</span></div>
+            <p className="admin-logs-intro">Acompanhe quem alterou produtos, estoque, pedidos, fidelidade e configurações.</p>
+            <div className="admin-toolbar logs-toolbar"><div className="admin-search"><Search size={17} /><input value={logSearch} onChange={(event) => setLogSearch(event.target.value)} placeholder="Buscar por usuário, ação ou descrição" aria-label="Buscar nos logs" /></div></div>
+            <div className="products-table-wrap"><table className="products-table admin-logs-table"><thead><tr><th>Ação</th><th>Descrição</th><th>Usuário</th><th>Data e hora</th></tr></thead><tbody>{logsLoading ? <tr><td colSpan={4}>Carregando logs...</td></tr> : visibleLogs.length ? visibleLogs.map((log) => <tr key={log.id}><td><span className={`log-action log-action-${log.action.toLowerCase()}`}>{log.action}</span></td><td><strong>{log.description}</strong>{log.entityId && <small className="order-note">Registro: {log.entityId}</small>}</td><td>{log.userName}</td><td>{new Date(log.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td></tr>) : <tr><td colSpan={4}>{activityLogs.length ? 'Nenhum log corresponde à busca.' : 'As ações realizadas no painel aparecerão aqui.'}</td></tr>}</tbody></table></div>
+          </section>
           <div className="admin-section-head"><div><span className="admin-kicker">configurações</span><h2>Preferências do catálogo</h2></div><span className="admin-breadcrumb">estrutura atual</span></div>
           <form className="admin-settings-form" onSubmit={saveSettings}><div className="admin-settings-grid"><label className="admin-settings-card"><span>Nome da loja</span><input value={settings.storeName} onChange={(event) => setSettings({ ...settings, storeName: event.target.value })} /></label><label className="admin-settings-card"><span>Horário de atendimento</span><input value={settings.hours} onChange={(event) => setSettings({ ...settings, hours: event.target.value })} /></label><label className="admin-settings-card"><span>Identificação do WhatsApp principal</span><input value={settings.whatsappPrimaryLabel} onChange={(event) => setSettings({ ...settings, whatsappPrimaryLabel: event.target.value })} placeholder="Ex.: Guilherme" /></label><label className="admin-settings-card"><span>WhatsApp principal</span><input value={settings.whatsappPrimary} onChange={(event) => setSettings({ ...settings, whatsappPrimary: event.target.value })} inputMode="numeric" /></label><label className="admin-settings-card"><span>WhatsApp secundário</span><input value={settings.whatsappSecondary} onChange={(event) => setSettings({ ...settings, whatsappSecondary: event.target.value })} inputMode="numeric" /></label><label className="admin-settings-card"><span>Identificação do segundo atendimento</span><input value={settings.whatsappSecondaryLabel} onChange={(event) => setSettings({ ...settings, whatsappSecondaryLabel: event.target.value })} /></label><label className="admin-settings-card"><span>Mensagem inicial do pedido</span><textarea value={settings.whatsappMessage} onChange={(event) => setSettings({ ...settings, whatsappMessage: event.target.value })} rows={2} /></label></div><div className="admin-settings-footer"><small>O Drive foi usado apenas como apoio na carga inicial. O catálogo usa os dados salvos no sistema.</small><button type="submit" className="new-product-button" disabled={settingsSaving}>{settingsSaving ? 'Salvando...' : 'Salvar preferências'} <Check size={16} /></button></div></form>
         </section>

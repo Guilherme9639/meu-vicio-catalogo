@@ -514,6 +514,15 @@ a { color: inherit; text-decoration: none; }
 .admin-loyalty-management-empty { margin: 12px 0 0; color: #8a9b92; font-size: 11px; }
 .admin-settings-section { margin-top: 34px; border-top: 1px solid #e4ece8; padding-top: 4px; }
 .admin-profile-block { margin-bottom: 28px; border-bottom: 1px solid #e4ece8; padding-bottom: 28px; }
+.admin-logs-section { margin-bottom: 30px; border-bottom: 1px solid #e4ece8; padding-bottom: 30px; }
+.admin-logs-intro { max-width: 680px; margin: -4px 0 15px; color: #789084; font-size: 11px; line-height: 1.45; }
+.logs-toolbar { margin: 0 0 12px; }
+.admin-logs-table { min-width: 680px; }
+.admin-logs-table td strong { color: #41594d; font-weight: 700; }
+.log-action { display: inline-flex; border-radius: 999px; padding: 5px 8px; font-size: 9px; font-weight: 800; }
+.log-action-criação { background: #e8f4ed; color: #408162; }
+.log-action-edição { background: #eef1fa; color: #6171a0; }
+.log-action-exclusão { background: #fff0ec; color: #b46654; }
 .admin-profile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .admin-settings-card input[readonly] { background: #f3f8f5; color: #789084; cursor: not-allowed; }
 .admin-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
