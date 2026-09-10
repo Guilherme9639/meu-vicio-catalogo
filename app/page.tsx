@@ -503,6 +503,7 @@ export default function Home() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [heroSlide, setHeroSlide] = useState(0);
   const [personalizationImage, setPersonalizationImage] = useState(0);
+  const heroTouchStartX = useRef<number | null>(null);
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem('meu-vicio-favoritos');
@@ -947,6 +948,18 @@ export default function Home() {
               aria-label="Destaques da loja"
               aria-roledescription="carousel"
               aria-live="polite"
+              onTouchStart={(event) => {
+                heroTouchStartX.current = event.touches[0]?.clientX ?? null;
+              }}
+              onTouchEnd={(event) => {
+                const startX = heroTouchStartX.current;
+                const endX = event.changedTouches[0]?.clientX;
+                heroTouchStartX.current = null;
+                if (startX === null || endX === undefined) return;
+                const distance = endX - startX;
+                if (Math.abs(distance) < 42) return;
+                setHeroSlide((current) => (current + 1) % 2);
+              }}
             >
               <div className="hero-carousel-topline">
                 <span>deslize pelos destaques</span>
