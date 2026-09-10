@@ -297,8 +297,20 @@ function StoreHeader({
   showFavoritesOnly: boolean;
   setShowFavoritesOnly: (show: boolean) => void;
 }) {
+  const siteNavRef = useRef<HTMLElement | null>(null);
   const categoryLinksRef = useRef<HTMLElement | null>(null);
+  const [hasMoreNav, setHasMoreNav] = useState(false);
   const [hasMoreCategories, setHasMoreCategories] = useState(false);
+  useEffect(() => {
+    const updateNavOverflow = () => {
+      const element = siteNavRef.current;
+      if (!element) return;
+      setHasMoreNav(element.scrollWidth - element.clientWidth - element.scrollLeft > 8);
+    };
+    updateNavOverflow();
+    window.addEventListener('resize', updateNavOverflow);
+    return () => window.removeEventListener('resize', updateNavOverflow);
+  }, []);
   useEffect(() => {
     const updateCategoryOverflow = () => {
       const element = categoryLinksRef.current;
@@ -313,6 +325,11 @@ function StoreHeader({
   }, [categories.length]);
   function showMoreCategories() {
     const element = categoryLinksRef.current;
+    if (!element) return;
+    element.scrollTo({ left: element.scrollWidth, behavior: 'smooth' });
+  }
+  function showMoreNav() {
+    const element = siteNavRef.current;
     if (!element) return;
     element.scrollTo({ left: element.scrollWidth, behavior: 'smooth' });
   }
@@ -335,17 +352,40 @@ function StoreHeader({
             <Menu size={20} />
           </button>
           <Brand storeName={storeName} />
-          <nav className={`site-nav ${mobileMenu ? 'site-nav-open' : ''}`}>
-            <a href="#colecao" onClick={() => setMobileMenu(false)}>
-              Coleção
-            </a>
-            <a href="#como-funciona" onClick={() => setMobileMenu(false)}>
-              Como funciona
-            </a>
-            <a href="#contato" onClick={() => setMobileMenu(false)}>
-              Atendimento
-            </a>
-          </nav>
+          <div className={hasMoreNav ? 'site-nav-shell has-more' : 'site-nav-shell'}>
+            <nav
+              ref={siteNavRef}
+              className={`site-nav ${mobileMenu ? 'site-nav-open' : ''}`}
+              aria-label="Navegação principal"
+              onScroll={() => {
+                const element = siteNavRef.current;
+                if (element) {
+                  setHasMoreNav(element.scrollWidth - element.clientWidth - element.scrollLeft > 8);
+                }
+              }}
+            >
+              <a href="#colecao" onClick={() => setMobileMenu(false)}>
+                Coleção
+              </a>
+              <a href="#como-funciona" onClick={() => setMobileMenu(false)}>
+                Como funciona
+              </a>
+              <a href="#contato" onClick={() => setMobileMenu(false)}>
+                Atendimento
+              </a>
+            </nav>
+            {hasMoreNav && (
+              <button
+                className="site-nav-scroll-button"
+                type="button"
+                onClick={showMoreNav}
+                aria-label="Ir para o final da navegação"
+                title="Ir para o final da navegação"
+              >
+                <ArrowRight size={15} />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               className={
