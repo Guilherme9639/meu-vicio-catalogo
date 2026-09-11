@@ -1,10 +1,11 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, SyntheticEvent, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_IMAGE_ADJUST, parseImageUrl, serializeImageUrl, type ImageAdjust } from '@/lib/image-adjust';
+import { normalizeProductName } from '@/lib/catalog-text';
 
 type SizeOption = { label: string; values: number[] };
 type AdminProduct = { id: string; name: string; category: string; color?: string; tag?: string; price: string; stock: number; status: 'Ativo' | 'Rascunho'; sizes: string[]; sizeQuantities?: Record<string, number>; description?: string; image: string; imageAdjust?: ImageAdjust; createdAt?: string };
@@ -112,25 +113,30 @@ export default function AdminPage() {
   const [logSearch, setLogSearch] = useState('');
   const [form, setForm] = useState({ name: '', category: 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [] as string[], quantities: {} as Record<string, number>, image: '/products/havaianas-branco.png', imageAdjust: DEFAULT_IMAGE_ADJUST });
   useEffect(() => {
-    if (!supabase) { setLoading(false); return; }
+    const client = supabase;
+    if (!client) { setLoading(false); return; }
+    const db = client;
     let mounted = true;
     async function initialize() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await db.auth.getSession();
       if (mounted) setSession(data.session);
       if (mounted) setLoading(false);
     }
-    initialize();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, currentSession) => setSession(currentSession));
+    void initialize();
+    const { data: listener } = db.auth.onAuthStateChange((_event, currentSession) => setSession(currentSession));
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, []);
   useEffect(() => {
-    if (!supabase || !session) return;
+    const client = supabase;
+    if (!client || !session) return;
+    const db = client;
+    const currentSession = session;
     let mounted = true;
     async function loadCatalog() {
       const [{ data: categoryRows }, { data: categorySizeRows }, { data: productRows }] = await Promise.all([
-        supabase.from('categories').select('id,name').order('name', { ascending: true }),
-        supabase.from('category_sizes').select('category_id,size_label,size_values,sort_order').order('sort_order', { ascending: true }),
-        supabase.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,created_at,product_sizes(size,quantity)').order('created_at', { ascending: false }),
+        db.from('categories').select('id,name').order('name', { ascending: true }),
+        db.from('category_sizes').select('category_id,size_label,size_values,sort_order').order('sort_order', { ascending: true }),
+        db.from('products').select('id,name,category,color,tag,price,description,is_active,image_url,created_at,product_sizes(size,quantity)').order('created_at', { ascending: false }),
       ]);
       if (!mounted) return;
       const nextCategories = (categoryRows || []) as AdminCategory[];
@@ -158,57 +164,57 @@ export default function AdminPage() {
           return [option?.label || String(item.size), item.quantity];
         }));
         const image = parseImageUrl(row.image_url);
-        return { id: row.id, name: row.name, category: categoryName, color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust, createdAt: row.created_at || '' };
+        return { id: row.id, name: normalizeProductName(row.name), category: categoryName, color: row.color || '', tag: row.tag || '', price: Number(row.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: Object.values(sizeQuantities).reduce((total, quantity) => total + Number(quantity), 0), status: row.is_active ? 'Ativo' : 'Rascunho', sizes: Object.keys(sizeQuantities).filter((label) => Number(sizeQuantities[label]) > 0), sizeQuantities, description: row.description || '', image: image.src, imageAdjust: image.adjust, createdAt: row.created_at || '' };
       }));
     }
     async function loadOrders() {
       setOrdersLoading(true);
-      const { data } = await supabase.from('orders').select('id,total,status,stock_deducted,whatsapp_number,customer_name,notes,created_at,order_items(product_id,product_name,selected_size,quantity)').order('created_at', { ascending: false });
+      const { data } = await db.from('orders').select('id,total,status,stock_deducted,whatsapp_number,customer_name,notes,created_at,order_items(product_id,product_name,selected_size,quantity)').order('created_at', { ascending: false });
       let productRows: { id: string; color: string | null }[] = [];
       const productIds = Array.from(new Set((data || []).flatMap((row) => (row.order_items || []).map((item: { product_id: string | null }) => item.product_id).filter((id): id is string => Boolean(id)))));
       if (productIds.length) {
-        const { data: rows } = await supabase.from('products').select('id,color').in('id', productIds);
+        const { data: rows } = await db.from('products').select('id,color').in('id', productIds);
         productRows = (rows || []) as { id: string; color: string | null }[];
       }
       const colorByProductId = new Map(productRows.map((row) => [row.id, row.color || '']));
-      if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, stockDeducted: Boolean(row.stock_deducted), whatsappNumber: row.whatsapp_number, customerName: row.customer_name || null, notes: row.notes || null, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_id: string | null; product_name: string; selected_size: string; quantity: number }) => ({ productName: item.product_name, color: item.product_id ? colorByProductId.get(item.product_id) || '' : '', size: item.selected_size, quantity: item.quantity })) })));
+      if (mounted && data) setOrders(data.map((row) => ({ id: row.id, total: Number(row.total), status: row.status, stockDeducted: Boolean(row.stock_deducted), whatsappNumber: row.whatsapp_number, customerName: row.customer_name || null, notes: row.notes || null, createdAt: row.created_at, items: (row.order_items || []).map((item: { product_id: string | null; product_name: string; selected_size: string; quantity: number }) => ({ productName: normalizeProductName(item.product_name), color: item.product_id ? colorByProductId.get(item.product_id) || '' : '', size: item.selected_size, quantity: item.quantity })) })));
       if (mounted) setOrdersLoading(false);
     }
     async function loadStockMovements() {
       setStockHistoryLoading(true);
-      const { data } = await supabase.from('stock_movements').select('id,product_name,size_label,previous_quantity,new_quantity,reason,created_at').order('created_at', { ascending: false }).limit(30);
-      if (mounted && data) setStockMovements(data.map((row) => ({ id: row.id, productName: row.product_name, size: row.size_label, previousQuantity: Number(row.previous_quantity), newQuantity: Number(row.new_quantity), reason: row.reason, createdAt: row.created_at })));
+      const { data } = await db.from('stock_movements').select('id,product_name,size_label,previous_quantity,new_quantity,reason,created_at').order('created_at', { ascending: false }).limit(30);
+      if (mounted && data) setStockMovements(data.map((row) => ({ id: row.id, productName: normalizeProductName(row.product_name), size: row.size_label, previousQuantity: Number(row.previous_quantity), newQuantity: Number(row.new_quantity), reason: row.reason, createdAt: row.created_at })));
       if (mounted) setStockHistoryLoading(false);
     }
     async function loadLoyaltyCards() {
       setLoyaltyLoading(true);
-      const { data } = await supabase.from('loyalty_cards').select('id,customer_name,customer_phone,created_at,loyalty_purchases(id,purchase_date)').order('created_at', { ascending: false });
+      const { data } = await db.from('loyalty_cards').select('id,customer_name,customer_phone,created_at,loyalty_purchases(id,purchase_date)').order('created_at', { ascending: false });
       if (mounted && data) setLoyaltyCards(data.map((row) => ({ id: row.id, customerName: row.customer_name, customerPhone: row.customer_phone || '', purchases: (row.loyalty_purchases || []).map((purchase: { id: string; purchase_date: string }) => ({ id: purchase.id, purchaseDate: purchase.purchase_date })).sort((a: LoyaltyPurchase, b: LoyaltyPurchase) => a.purchaseDate.localeCompare(b.purchaseDate)) })));
       if (mounted) setLoyaltyLoading(false);
     }
     async function loadSettings() {
-      const { data } = await supabase.from('store_settings').select('store_name,hours,whatsapp_primary,whatsapp_primary_label,whatsapp_secondary,whatsapp_secondary_label,whatsapp_message').eq('id', 'default').maybeSingle();
+      const { data } = await db.from('store_settings').select('store_name,hours,whatsapp_primary,whatsapp_primary_label,whatsapp_secondary,whatsapp_secondary_label,whatsapp_message').eq('id', 'default').maybeSingle();
       if (mounted && data) setSettings({ storeName: data.store_name, hours: data.hours, whatsappPrimary: data.whatsapp_primary, whatsappPrimaryLabel: data.whatsapp_primary_label || 'Atendimento principal', whatsappSecondary: data.whatsapp_secondary, whatsappSecondaryLabel: data.whatsapp_secondary_label, whatsappMessage: data.whatsapp_message });
     }
     async function loadProfile() {
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).maybeSingle();
+      const { data } = await db.from('profiles').select('full_name').eq('id', currentSession.user.id).maybeSingle();
       if (!mounted) return;
-      const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Administrador';
+      const fallbackName = currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Administrador';
       setProfile({ fullName: data?.full_name || fallbackName });
     }
     async function loadActivityLogs() {
       setLogsLoading(true);
-      const { data } = await supabase.from('activity_logs').select('id,action,entity_type,entity_id,description,created_at,profiles:changed_by(full_name)').order('created_at', { ascending: false }).limit(100);
-      if (mounted && data) setActivityLogs(data.map((row: { id: string; action: string; entity_type: string; entity_id: string | null; description: string; created_at: string; profiles?: { full_name?: string | null } | null }) => ({ id: row.id, action: row.action, entityType: row.entity_type, entityId: row.entity_id, description: row.description, createdAt: row.created_at, userName: row.profiles?.full_name || 'Administrador' })));
+      const { data } = await db.from('activity_logs').select('id,action,entity_type,entity_id,description,created_at,profiles:changed_by(full_name)').order('created_at', { ascending: false }).limit(100);
+      if (mounted && data) setActivityLogs(data.map((row) => ({ id: row.id, action: row.action, entityType: row.entity_type, entityId: row.entity_id, description: row.description, createdAt: row.created_at, userName: row.profiles?.[0]?.full_name || 'Administrador' })));
       if (mounted) setLogsLoading(false);
     }
-    loadCatalog();
-    loadOrders();
-    loadStockMovements();
-    loadLoyaltyCards();
-    loadSettings();
-    loadProfile();
-    loadActivityLogs();
+    void loadCatalog();
+    void loadOrders();
+    void loadStockMovements();
+    void loadLoyaltyCards();
+    void loadSettings();
+    void loadProfile();
+    void loadActivityLogs();
     return () => { mounted = false; };
   }, [session]);
   const visibleItems = useMemo(() => {
@@ -235,7 +241,7 @@ export default function AdminPage() {
       imageCount: items.filter((item) => item.image !== '/products/havaianas-branco.png').length,
     };
   }, [items, categories]);
-  async function signIn(event: FormEvent) { event.preventDefault(); if (!supabase) return; setAuthLoading(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword(authForm); if (error) setAuthError('Não foi possível entrar. Confira seu e-mail e senha.'); setAuthLoading(false); }
+  async function signIn(event: SyntheticEvent<HTMLFormElement>) { event.preventDefault(); if (!supabase) return; setAuthLoading(true); setAuthError(''); const { error } = await supabase.auth.signInWithPassword(authForm); if (error) setAuthError('Não foi possível entrar. Confira seu e-mail e senha.'); setAuthLoading(false); }
   async function signOut() { if (supabase) await supabase.auth.signOut(); }
   async function createActivityLog(action: string, entityType: string, description: string, entityId?: string | null, details?: Record<string, unknown>) {
     if (!supabase || !session) return;
@@ -291,7 +297,7 @@ export default function AdminPage() {
     if (error) { setActionMessage('Produto salvo, mas o histórico do estoque não foi registrado.'); return; }
     if (data) setStockMovements((current) => [...data.map((row) => ({ id: row.id, productName: row.product_name, size: row.size_label, previousQuantity: Number(row.previous_quantity), newQuantity: Number(row.new_quantity), reason: row.reason, createdAt: row.created_at })), ...current].slice(0, 30));
   }
-  async function saveCategory(event: FormEvent) {
+  async function saveCategory(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = newCategoryName.trim();
     if (!name) return;
@@ -323,7 +329,7 @@ export default function AdminPage() {
     setEditingCategoryId(null);
     setEditingCategoryName('');
   }
-  async function updateCategory(event: FormEvent, category: AdminCategory) {
+  async function updateCategory(event: SyntheticEvent<HTMLFormElement>, category: AdminCategory) {
     event.preventDefault();
     const nextName = editingCategoryName.trim();
     if (!nextName) {
@@ -419,7 +425,7 @@ export default function AdminPage() {
   function getOptionsForCategory(category: string) {
     return categorySizeOptions[category] || defaultOptionsForCategory(category);
   }
-  async function saveCategorySizes(event: FormEvent, category: AdminCategory) {
+  async function saveCategorySizes(event: SyntheticEvent<HTMLFormElement>, category: AdminCategory) {
     event.preventDefault();
     const options = parseCategorySizeDraft(categorySizeDrafts[category.id] || '');
     if (!options.length) {
@@ -482,7 +488,7 @@ export default function AdminPage() {
       await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
       setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
     } else {
-      const localId = editingProductId || String(Date.now());
+      const localId = editingProductId || crypto.randomUUID();
       const nextItem = { id: localId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes, sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || form.image, imageAdjust: form.imageAdjust };
       setItems((current) => editingProductId ? current.map((item) => item.id === editingProductId ? nextItem : item) : [nextItem, ...current]);
     }
@@ -508,7 +514,7 @@ export default function AdminPage() {
       setItems((current) => current.map((product) => {
         const productItems = (orderItems || []).filter((item: { product_id: string | null }) => item.product_id === product.id);
         if (!productItems.length) return product;
-        const nextQuantities = { ...(product.sizeQuantities || {}) };
+        const nextQuantities = { ...product.sizeQuantities };
         productItems.forEach((item: { selected_size: string; quantity: number }) => { nextQuantities[item.selected_size] = Math.max(0, (nextQuantities[item.selected_size] || 0) - Number(item.quantity)); });
         return { ...product, sizeQuantities: nextQuantities, stock: Object.values(nextQuantities).reduce((total, quantity) => total + Number(quantity), 0), sizes: Object.keys(nextQuantities).filter((size) => Number(nextQuantities[size]) > 0) };
       }));
@@ -602,7 +608,7 @@ export default function AdminPage() {
     setActionMessage('Produto excluído com segurança.');
     void createActivityLog('Exclusão', 'Produto', `Produto ${item.name} excluído.`, item.id);
   }
-  async function saveSettings(event: FormEvent) {
+  async function saveSettings(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !session) return;
     setSettingsSaving(true);
@@ -612,7 +618,7 @@ export default function AdminPage() {
     if (!error) void createActivityLog('Edição', 'Preferências', 'Preferências do catálogo atualizadas.');
     setSettingsSaving(false);
   }
-  async function addLoyaltyCard(event: FormEvent) {
+  async function addLoyaltyCard(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const customerName = loyaltyForm.customerName.trim();
     if (!customerName) { setActionMessage('Informe o nome do cliente para criar a cartela.'); return; }
@@ -662,7 +668,7 @@ export default function AdminPage() {
     setActionMessage(`${card.customerName}: compra ${card.purchases.length + 1} de 10 registrada.`);
     void createActivityLog('Criação', 'Fidelidade', `Compra ${card.purchases.length + 1} de 10 registrada para ${card.customerName}.`, card.id, { purchaseDate });
   }
-  async function saveProfile(event: FormEvent) {
+  async function saveProfile(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !session) return;
     const fullName = profile.fullName.trim();

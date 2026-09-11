@@ -23,6 +23,7 @@ import {
   parseImageUrl,
   type ImageAdjust,
 } from '@/lib/image-adjust';
+import { normalizeProductName, productCategoryLabel } from '@/lib/catalog-text';
 
 type Product = {
   id: string;
@@ -100,10 +101,6 @@ function defaultOptionsForCategory(category: string) {
   if (category === 'Adulto') return adultSizeOptions;
   if (category === 'Infantil') return infantSizeOptions;
   return sizeOptions;
-}
-function productCategoryLabel(category: string) {
-  const name = category.trim();
-  return /^havaianas\b/i.test(name) ? name : `Havaianas ${name}`;
 }
 function getAvailableQuantity(product: Product, size: string) {
   const option = (product.sizeOptions || defaultOptionsForCategory(product.category)).find(
@@ -658,7 +655,7 @@ export default function Home() {
         const productCategory = String(row.category || 'Adulto');
         return {
           id: row.id,
-          name: row.name,
+          name: normalizeProductName(row.name),
           category: productCategory,
           color: row.color || 'Sem cor',
           tag: row.tag || undefined,
@@ -694,7 +691,7 @@ export default function Home() {
       );
       setCatalogLoading(false);
     }
-    loadCatalog();
+    void loadCatalog();
     return () => {
       mounted = false;
     };
@@ -721,7 +718,7 @@ export default function Home() {
         whatsappMessage: data.whatsapp_message,
       });
     }
-    loadSettings();
+    void loadSettings();
     return () => {
       mounted = false;
     };
@@ -875,7 +872,8 @@ export default function Home() {
     return false;
   }
   function recordOrder(number: string) {
-    if (!supabase || !cart.length) return;
+    const client = supabase;
+    if (!client || !cart.length) return;
     const orderId = crypto.randomUUID();
     const orderItems = cart.map((item) => ({
       order_id: orderId,
@@ -890,7 +888,7 @@ export default function Home() {
       quantity: item.quantity,
       unit_price: item.price,
     }));
-    void supabase
+    void client
       .from('orders')
       .insert({
         id: orderId,
@@ -901,7 +899,7 @@ export default function Home() {
         status: 'Novo',
       })
       .then(({ error }) =>
-        error ? null : supabase.from('order_items').insert(orderItems),
+        error ? null : client.from('order_items').insert(orderItems),
       );
   }
   function sendToWhatsApp(number: string) {
