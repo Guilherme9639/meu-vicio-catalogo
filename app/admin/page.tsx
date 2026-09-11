@@ -68,6 +68,7 @@ function formatCategorySizeOptions(options: SizeOption[]) {
 export default function AdminPage() {
   const [items, setItems] = useState(initialProducts);
   const [session, setSession] = useState<Session | null>(null);
+  const [adminAuthorized, setAdminAuthorized] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
   const [authForm, setAuthForm] = useState({ email: '', password: '' });
   const [authError, setAuthError] = useState('');
@@ -114,12 +115,13 @@ export default function AdminPage() {
   const [form, setForm] = useState({ name: '', category: 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [] as string[], quantities: {} as Record<string, number>, image: '/products/havaianas-branco.png', imageAdjust: DEFAULT_IMAGE_ADJUST });
   useEffect(() => {
     const client = supabase;
-    if (!client) { setLoading(false); return; }
+    if (!client) { setLoading(false); setAdminAuthorized(false); return; }
     const db = client;
     let mounted = true;
     async function initialize() {
       const { data } = await db.auth.getSession();
       if (mounted) setSession(data.session);
+      if (mounted && !data.session) setAdminAuthorized(false);
       if (mounted) setLoading(false);
     }
     void initialize();
@@ -128,7 +130,27 @@ export default function AdminPage() {
   }, []);
   useEffect(() => {
     const client = supabase;
-    if (!client || !session) return;
+    if (!client || !session) { setAdminAuthorized(false); return; }
+    const db = client;
+    let mounted = true;
+    async function verifyAdminAccess() {
+      const { data, error } = await db.rpc('is_admin');
+      if (!mounted) return;
+      if (error || data !== true) {
+        setAdminAuthorized(false);
+        setAuthError('Esta conta não tem permissão para acessar o painel.');
+        await db.auth.signOut();
+        return;
+      }
+      setAuthError('');
+      setAdminAuthorized(true);
+    }
+    void verifyAdminAccess();
+    return () => { mounted = false; };
+  }, [session]);
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !session || adminAuthorized !== true) return;
     const db = client;
     const currentSession = session;
     let mounted = true;
@@ -216,7 +238,7 @@ export default function AdminPage() {
     void loadProfile();
     void loadActivityLogs();
     return () => { mounted = false; };
-  }, [session]);
+  }, [session, adminAuthorized]);
   const visibleItems = useMemo(() => {
     const categoryOrder = new Map(categories.map((category, index) => [category.name.toLocaleLowerCase(), index]));
     return items
@@ -693,6 +715,7 @@ export default function AdminPage() {
   const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
 
   if (supabase && loading) return <main className="admin-auth-shell"><div className="admin-auth-card"><span className="admin-brand-mark">mv</span><h1>Carregando painel</h1><p>Preparando a conexão segura com a loja.</p></div></main>;
+  if (supabase && session && adminAuthorized !== true) return <main className="admin-auth-shell"><div className="admin-auth-card"><span className="admin-brand-mark">mv</span><h1>Verificando acesso</h1><p>Confirmando a permissão de administrador da sua conta.</p></div></main>;
   if (supabase && !session) return <main className="admin-auth-shell"><form className="admin-auth-card" onSubmit={signIn}><span className="admin-brand-mark">mv</span><span className="admin-kicker">acesso restrito</span><h1>Painel da loja</h1><p>Entre com o usuário administrador do Supabase para gerenciar produtos e estoque.</p><label>E-mail<input type="email" required value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} placeholder="seu@email.com" /></label><label>Senha<input type="password" required value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} placeholder="Sua senha" /></label>{authError && <small className="auth-error">{authError}</small>}<button type="submit" className="new-product-button" disabled={authLoading}>{authLoading ? 'Entrando...' : 'Entrar no painel'}</button><a href="/" className="auth-back-link">Voltar ao catálogo</a></form></main>;
 
   return <main className="admin-shell">
