@@ -533,6 +533,13 @@ export default function AdminPage() {
         setActionMessage(message);
         return;
       }
+      // A função de baixa também pode manter o pedido como "Confirmado".
+      // Persiste o status solicitado para que "Concluído" não seja apenas local.
+      const statusResult = await supabase.from('orders').update({ status }).eq('id', id);
+      if (statusResult.error) {
+        setActionMessage('Estoque atualizado, mas não foi possível salvar o status Concluído. Tente novamente.');
+        return;
+      }
       setItems((current) => current.map((product) => {
         const productItems = (orderItems || []).filter((item: { product_id: string | null }) => item.product_id === product.id);
         if (!productItems.length) return product;
