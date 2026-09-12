@@ -522,14 +522,14 @@ export default function AdminPage() {
   async function updateOrderStatus(id: string, status: string) {
     if (!supabase || !session) return;
     const currentOrder = orders.find((order) => order.id === id);
-    const shouldDeductStock = status === 'Confirmado' && currentOrder?.status !== 'Confirmado' && !currentOrder?.stockDeducted;
+    const shouldDeductStock = status === 'Concluído' && currentOrder?.status !== 'Concluído' && !currentOrder?.stockDeducted;
     if (shouldDeductStock) {
-      setActionMessage('Confirmando pedido e ajustando o estoque...');
+      setActionMessage('Concluindo pedido e ajustando o estoque...');
       const { data: orderItems, error: itemsError } = await supabase.from('order_items').select('product_id,selected_size,quantity').eq('order_id', id);
       if (itemsError) { setActionMessage('Não foi possível carregar os itens do pedido.'); return; }
       const { error: deductionError } = await supabase.rpc('confirm_order_and_deduct_stock', { p_order_id: id });
       if (deductionError) {
-        const message = deductionError.message.includes('INSUFFICIENT_STOCK') ? 'Estoque insuficiente para confirmar este pedido.' : deductionError.message.includes('STOCK_NOT_REGISTERED') ? 'Um dos tamanhos do pedido não está cadastrado no estoque.' : 'Não foi possível confirmar o pedido e ajustar o estoque.';
+        const message = deductionError.message.includes('INSUFFICIENT_STOCK') ? 'Estoque insuficiente para concluir este pedido.' : deductionError.message.includes('STOCK_NOT_REGISTERED') ? 'Um dos tamanhos do pedido não está cadastrado no estoque.' : 'Não foi possível concluir o pedido e ajustar o estoque.';
         setActionMessage(message);
         return;
       }
@@ -545,7 +545,7 @@ export default function AdminPage() {
       if (error) { setActionMessage('Não foi possível atualizar o status do pedido.'); return; }
     }
     setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: order.stockDeducted || shouldDeductStock } : order));
-    setActionMessage(shouldDeductStock ? 'Pedido confirmado e estoque atualizado.' : 'Status do pedido atualizado.');
+    setActionMessage(shouldDeductStock ? 'Pedido concluído e estoque atualizado.' : 'Status do pedido atualizado.');
     void createActivityLog('Edição', 'Pedido', `Status do pedido alterado para ${status}.`, id, { status, stockDeducted: shouldDeductStock });
   }
   async function deleteOrder(order: AdminOrder) {
