@@ -523,37 +523,95 @@ export default function AdminPage() {
     if (!supabase || !session) return;
     const currentOrder = orders.find((order) => order.id === id);
     const shouldDeductStock = status === 'Concluído' && currentOrder?.status !== 'Concluído' && !currentOrder?.stockDeducted;
-    if (shouldDeductStock) {
-      setActionMessage('Concluindo pedido e ajustando o estoque...');
+    const shouldRestoreStock = status !== 'Concluído' && currentOrder?.status === 'Concluído' && Boolean(currentOrder.stockDeducted);
+    if (shouldDeductStock || shouldRestoreStock) {
+      setActionMessage(shouldDeductStock ? 'Concluindo pedido e ajustando o estoque...' : 'Reabrindo pedido e devolvendo o estoque...');
       const { data: orderItems, error: itemsError } = await supabase.from('order_items').select('product_id,selected_size,quantity').eq('order_id', id);
       if (itemsError) { setActionMessage('Não foi possível carregar os itens do pedido.'); return; }
-      const { error: deductionError } = await supabase.rpc('confirm_order_and_deduct_stock', { p_order_id: id });
-      if (deductionError) {
-        const message = deductionError.message.includes('INSUFFICIENT_STOCK') ? 'Estoque insuficiente para concluir este pedido.' : deductionError.message.includes('STOCK_NOT_REGISTERED') ? 'Um dos tamanhos do pedido não está cadastrado no estoque.' : 'Não foi possível concluir o pedido e ajustar o estoque.';
-        setActionMessage(message);
-        return;
+      if (shouldDeductStock) {
+        const { error: deductionError } = await supabase.rpc('confirm_order_and_deduct_stock', { p_order_id: id });
+        if (deductionError) {
+          const message = deductionError.message.includes('INSUFFICIENT_STOCK') ? 'Estoque insuficiente para concluir este pedido.' : deductionError.message.includes('STOCK_NOT_REGISTERED') ? 'Um dos tamanhos do pedido não está cadastrado no estoque.' : 'Não foi possível concluir o pedido e ajustar o estoque.';
+          setActionMessage(message);
+          return;
+        }
+        // A função de baixa também pode manter o pedido como "Confirmado".
+        // Persiste o status solicitado para que "Concluído" não seja apenas local.
+        const statusResult = await supabase.from('orders').update({ status }).eq('id', id);
+        if (statusResult.error) {
+          setActionMessage('Estoque atualizado, mas não foi possível salvar o status Concluído. Tente novamente.');
+          return;
+        }
+        setItems((current) => current.map((product) => {
+          const productItems = (orderItems || []).filter((item: { product_id: string | null }) => item.product_id === product.id);
+          if (!productItems.length) return product;
+          const nextQuantities = { ...product.sizeQuantities };
+          productItems.forEach((item: { selected_size: string; quantity: number }) => { nextQuantities[item.selected_size] = Math.max(0, (nextQuantities[item.selected_size] || 0) - Number(item.quantity)); });
+          return { ...product, sizeQuantities: nextQuantities, stock: Object.values(nextQuantities).reduce((total, quantity) => total + Number(quantity), 0), sizes: Object.keys(nextQuantities).filter((size) => Number(nextQuantities[size]) > 0) };
+        }));
+      } else {
+        const restorableItems = (orderItems || []) as { product_id: string | null; selected_size: string; quantity: number }[];
+        if (restorableItems.some((item) => !item.product_id)) {
+          setActionMessage('Não foi possível devolver o estoque deste pedido porque um item não está vinculado a um produto.');
+          return;
+        }
+        const productIds = Array.from(new Set(restorableItems.map((item) => item.product_id).filter((productId): productId is string => Boolean(productId))));
+        const sizesResult = await supabase.from('product_sizes').select('id,product_id,size,quantity').in('product_id', productIds);
+        if (sizesResult.error || !sizesResult.data) {
+          setActionMessage('Não foi possível consultar o estoque para reabrir este pedido.');
+          return;
+        }
+        const restoreRequests = Array.from(restorableItems.reduce((requests, item) => {
+          const sizeValue = Number(String(item.selected_size).split('/')[0].trim());
+          const key = `${item.product_id}:${sizeValue}`;
+          const current = requests.get(key);
+          requests.set(key, current ? { ...current, quantity: current.quantity + Number(item.quantity) } : { productId: item.product_id as string, label: item.selected_size, sizeValue, quantity: Number(item.quantity) });
+          return requests;
+        }, new Map<string, { productId: string; label: string; sizeValue: number; quantity: number }>()).values());
+        const appliedChanges: { id: string; productId: string; label: string; previousQuantity: number; nextQuantity: number }[] = [];
+        for (const item of restoreRequests) {
+          const stockRow = (sizesResult.data as { id: string; product_id: string; size: number; quantity: number }[]).find((row) => row.product_id === item.productId && Number(row.size) === item.sizeValue);
+          if (!stockRow) {
+            setActionMessage(`Não foi possível devolver o estoque: o tamanho ${item.label} não está cadastrado no produto.`);
+            for (const applied of appliedChanges) await supabase.from('product_sizes').update({ quantity: applied.previousQuantity }).eq('id', applied.id);
+            return;
+          }
+          const previousQuantity = Number(stockRow.quantity || 0);
+          const nextQuantity = previousQuantity + item.quantity;
+          const updateResult = await supabase.from('product_sizes').update({ quantity: nextQuantity }).eq('id', stockRow.id);
+          if (updateResult.error) {
+            for (const applied of appliedChanges) await supabase.from('product_sizes').update({ quantity: applied.previousQuantity }).eq('id', applied.id);
+            setActionMessage('Não foi possível devolver todo o estoque deste pedido. Nenhuma alteração parcial foi mantida.');
+            return;
+          }
+          appliedChanges.push({ id: stockRow.id, productId: item.productId, label: item.label, previousQuantity, nextQuantity });
+        }
+        const statusResult = await supabase.from('orders').update({ status, stock_deducted: false }).eq('id', id);
+        if (statusResult.error) {
+          for (const applied of appliedChanges) await supabase.from('product_sizes').update({ quantity: applied.previousQuantity }).eq('id', applied.id);
+          setActionMessage('O estoque foi protegido, mas não foi possível salvar o novo status do pedido.');
+          return;
+        }
+        for (const change of appliedChanges) {
+          const product = items.find((item) => item.id === change.productId);
+          await logStockChanges(change.productId, product?.name || 'Produto do pedido', { [change.label]: change.previousQuantity }, { [change.label]: change.nextQuantity }, 'Reversão de pedido');
+        }
+        setItems((current) => current.map((product) => {
+          const productChanges = appliedChanges.filter((change) => change.productId === product.id);
+          if (!productChanges.length) return product;
+          const nextQuantities = { ...product.sizeQuantities };
+          productChanges.forEach((change) => { nextQuantities[change.label] = change.nextQuantity; });
+          return { ...product, sizeQuantities: nextQuantities, stock: Object.values(nextQuantities).reduce((total, quantity) => total + Number(quantity), 0), sizes: Object.keys(nextQuantities).filter((size) => Number(nextQuantities[size]) > 0) };
+        }));
       }
-      // A função de baixa também pode manter o pedido como "Confirmado".
-      // Persiste o status solicitado para que "Concluído" não seja apenas local.
-      const statusResult = await supabase.from('orders').update({ status }).eq('id', id);
-      if (statusResult.error) {
-        setActionMessage('Estoque atualizado, mas não foi possível salvar o status Concluído. Tente novamente.');
-        return;
-      }
-      setItems((current) => current.map((product) => {
-        const productItems = (orderItems || []).filter((item: { product_id: string | null }) => item.product_id === product.id);
-        if (!productItems.length) return product;
-        const nextQuantities = { ...product.sizeQuantities };
-        productItems.forEach((item: { selected_size: string; quantity: number }) => { nextQuantities[item.selected_size] = Math.max(0, (nextQuantities[item.selected_size] || 0) - Number(item.quantity)); });
-        return { ...product, sizeQuantities: nextQuantities, stock: Object.values(nextQuantities).reduce((total, quantity) => total + Number(quantity), 0), sizes: Object.keys(nextQuantities).filter((size) => Number(nextQuantities[size]) > 0) };
-      }));
     } else {
       const { error } = await supabase.from('orders').update({ status }).eq('id', id);
       if (error) { setActionMessage('Não foi possível atualizar o status do pedido.'); return; }
     }
-    setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: order.stockDeducted || shouldDeductStock } : order));
-    setActionMessage(shouldDeductStock ? 'Pedido concluído e estoque atualizado.' : 'Status do pedido atualizado.');
-    void createActivityLog('Edição', 'Pedido', `Status do pedido alterado para ${status}.`, id, { status, stockDeducted: shouldDeductStock });
+    setOrders((current) => current.map((order) => order.id === id ? { ...order, status, stockDeducted: shouldRestoreStock ? false : order.stockDeducted || shouldDeductStock } : order));
+    setActionMessage(shouldDeductStock ? 'Pedido concluído e estoque atualizado.' : shouldRestoreStock ? 'Pedido reaberto e estoque restaurado.' : 'Status do pedido atualizado.');
+    const stockAction = shouldDeductStock ? 'baixa realizada' : shouldRestoreStock ? 'estoque restaurado' : 'sem alteração no estoque';
+    void createActivityLog('Edição', 'Pedido', `Status do pedido alterado para ${status}; ${stockAction}.`, id, { status, stockDeducted: shouldRestoreStock ? false : shouldDeductStock, stockRestored: shouldRestoreStock, stockAction });
   }
   async function deleteOrder(order: AdminOrder) {
     if (!supabase || !session) return;
