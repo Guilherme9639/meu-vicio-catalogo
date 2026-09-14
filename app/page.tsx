@@ -296,6 +296,7 @@ function StoreHeader({
   search,
   setSearch,
   setCategory,
+  setSelectedSize,
   categories,
   selectedCategory,
   cartCount,
@@ -310,6 +311,7 @@ function StoreHeader({
   search: string;
   setSearch: (value: string) => void;
   setCategory: (category: string) => void;
+  setSelectedSize: (size: string | null) => void;
   categories: string[];
   selectedCategory: string;
   cartCount: number;
@@ -487,7 +489,10 @@ function StoreHeader({
             <a
               className={selectedCategory === 'Todos' ? 'active' : ''}
               href="#colecao"
-              onClick={() => setCategory('Todos')}
+              onClick={() => {
+                setCategory('Todos');
+                setSelectedSize(null);
+              }}
             >
               Todos
             </a>
@@ -496,7 +501,10 @@ function StoreHeader({
                 className={selectedCategory === name ? 'active' : ''}
                 href="#colecao"
                 key={name}
-                onClick={() => setCategory(name)}
+                onClick={() => {
+                  setCategory(name);
+                  setSelectedSize(null);
+                }}
               >
                 {name}
               </a>
@@ -504,7 +512,10 @@ function StoreHeader({
             <a
               className="category-special"
               href="#colecao"
-              onClick={() => setCategory('Todos')}
+              onClick={() => {
+                setCategory('Todos');
+                setSelectedSize(null);
+              }}
             >
               Mais vendidos
             </a>
@@ -996,6 +1007,7 @@ export default function Home() {
         search={search}
         setSearch={setSearch}
         setCategory={setCategory}
+        setSelectedSize={setSelectedSize}
         categories={catalogCategories}
         selectedCategory={category}
         cartCount={cartCount}
@@ -1271,7 +1283,10 @@ export default function Home() {
             <span>Categoria</span>
             <select
               value={category}
-              onChange={(event) => setCategory(event.target.value)}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setSelectedSize(null);
+              }}
             >
               <option>Todos</option>
               {catalogCategories.map((name) => (
