@@ -42,9 +42,29 @@ const adminSizes: SizeOption[] = [
 ];
 const adminAdultSizeOptions = adminSizes.filter((option) => option.values[0] >= 33);
 const adminInfantSizeOptions = adminSizes.filter((option) => option.values[0] <= 32);
+const adminPapeteFemininaSizeOptions: SizeOption[] = Array.from(
+  { length: 8 },
+  (_, index) => {
+    const value = 33 + index;
+    return { label: String(value), values: [value] };
+  },
+);
+const adminPapeteMasculinaSizeOptions: SizeOption[] = Array.from(
+  { length: 8 },
+  (_, index) => {
+    const value = 37 + index;
+    return { label: String(value), values: [value] };
+  },
+);
+function normalizeCategoryName(category: string) {
+  return category.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 function defaultOptionsForCategory(category: string) {
-  if (category === 'Adulto') return adminAdultSizeOptions;
-  if (category === 'Infantil') return adminInfantSizeOptions;
+  const normalized = normalizeCategoryName(category);
+  if (normalized === 'adulto') return adminAdultSizeOptions;
+  if (normalized === 'infantil') return adminInfantSizeOptions;
+  if (normalized === 'papete feminina') return adminPapeteFemininaSizeOptions;
+  if (normalized === 'papete masculina') return adminPapeteMasculinaSizeOptions;
   return adminSizes;
 }
 function parseCategorySizeDraft(value: string): SizeOption[] {
