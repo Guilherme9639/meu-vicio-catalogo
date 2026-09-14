@@ -777,9 +777,11 @@ export default function Home() {
             product.sizeOptions || defaultOptionsForCategory(product.category)
           ).find((option) => option.label === selectedSize);
           const hasSize =
-            !selectedOption ||
-            selectedOption.values.some(
-              (value) => (product.sizes[value] ?? 0) > 0,
+            selectedSize === null ||
+            Boolean(
+              selectedOption?.values.some(
+                (value) => (product.sizes[value] ?? 0) > 0,
+              ),
             );
           return (
             (category === 'Todos' || product.category === category) &&
