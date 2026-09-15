@@ -486,16 +486,6 @@ function StoreHeader({
                 }
               }}
             >
-            <a
-              className={selectedCategory === 'Todos' ? 'active' : ''}
-              href="#colecao"
-              onClick={() => {
-                setCategory('Todos');
-                setSelectedSize(null);
-              }}
-            >
-              Todos
-            </a>
             {categories.map((name) => (
               <a
                 className={selectedCategory === name ? 'active' : ''}
@@ -513,7 +503,7 @@ function StoreHeader({
               className="category-special"
               href="#colecao"
               onClick={() => {
-                setCategory('Todos');
+                setCategory(categories[0] || '');
                 setSelectedSize(null);
               }}
             >
@@ -611,6 +601,12 @@ export default function Home() {
       delete document.documentElement.dataset.heroSlide;
     };
   }, [heroSlide]);
+  useEffect(() => {
+    if (category === 'Todos' && catalogCategories.length) {
+      setCategory(catalogCategories[0]);
+      setSelectedSize(null);
+    }
+  }, [category, catalogCategories]);
   const visibleSizeOptions = useMemo(() => {
     if (category !== 'Todos') {
       return categorySizeOptions[category] || defaultOptionsForCategory(category);
@@ -1290,7 +1286,6 @@ export default function Home() {
                 setSelectedSize(null);
               }}
             >
-              <option>Todos</option>
               {catalogCategories.map((name) => (
                 <option key={name}>{name}</option>
               ))}
@@ -1308,11 +1303,10 @@ export default function Home() {
                 }
                 onClick={() => {
                   setSelectedSize(null);
-                  setCategory('Todos');
                 }}
                 type="button"
               >
-                Todos
+                Todos os tamanhos
               </button>
               {visibleSizeOptions.map((option) => (
                 <button
