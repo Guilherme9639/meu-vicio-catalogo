@@ -1539,6 +1539,11 @@ export default function Home() {
             <p className="text-xs text-[#9e897a]">{settings.hours}</p>
           </div>
         </div>
+        <div className="footer-credit">
+          <a href="https://finnova.site" target="_blank" rel="noreferrer">
+            Desenvolvido por FINNOVA STUDIO
+          </a>
+        </div>
       </footer>
       {activeProduct && (
         <div
