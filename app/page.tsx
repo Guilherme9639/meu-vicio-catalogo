@@ -491,7 +491,8 @@ function StoreHeader({
                 className={selectedCategory === name ? 'active' : ''}
                 href="#colecao"
                 key={name}
-                onClick={() => {
+                onClick={(event) => {
+                  event.preventDefault();
                   setCategory(name);
                   setSelectedSize(null);
                 }}
@@ -502,7 +503,8 @@ function StoreHeader({
             <a
               className="category-special"
               href="#colecao"
-              onClick={() => {
+              onClick={(event) => {
+                event.preventDefault();
                 setCategory(categories[0] || '');
                 setSelectedSize(null);
               }}
@@ -1285,9 +1287,15 @@ export default function Home() {
                 setCategory(event.target.value);
                 setSelectedSize(null);
               }}
+              onInput={(event) => {
+                setCategory(event.currentTarget.value);
+                setSelectedSize(null);
+              }}
             >
               {catalogCategories.map((name) => (
-                <option key={name}>{name}</option>
+                <option key={name} value={name}>
+                  {name}
+                </option>
               ))}
             </select>
             <ChevronDown size={16} />
