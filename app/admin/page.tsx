@@ -500,6 +500,10 @@ export default function AdminPage() {
     if (!form.name.trim() || !form.price.trim()) { setActionMessage('Preencha o nome e o preço do produto.'); return; }
     const previousItem = editingProductId ? items.find((item) => item.id === editingProductId) : undefined;
     const numericPrice = parsePrice(form.price);
+    let activityAction = editingProductId ? 'Edição' : 'Criação';
+    let activityProductId = editingProductId;
+    let activityDescription = `${editingProductId ? 'Produto atualizado' : 'Produto cadastrado'}: ${form.name.trim()}.`;
+    let customSuccessMessage = '';
     let imageUrl: string | null = form.image.startsWith('blob:') ? null : form.image;
     if (imageFile && supabase && session) {
       const path = `${crypto.randomUUID()}-${imageFile.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`;
@@ -523,19 +527,48 @@ export default function AdminPage() {
       await logStockChanges(editingProductId, form.name.trim(), previousItem?.sizeQuantities || {}, nextItem.sizeQuantities, 'Ajuste manual');
       setItems((current) => current.map((item) => item.id === editingProductId ? nextItem : item));
     } else if (supabase && session) {
-      const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id,created_at').single();
-      if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
-      const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
-      if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
-      await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
-      setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
+      const existingResult = await supabase.from('products').select('id,name,category,color,tag,price,description,image_url,is_active,created_at').eq('category', form.category).ilike('name', form.name.trim()).limit(20);
+      if (existingResult.error) { setActionMessage('Não foi possível verificar se este modelo já está cadastrado.'); return; }
+      const normalizedName = normalizeProductName(form.name.trim()).trim().toLocaleLowerCase('pt-BR');
+      const normalizedColor = form.color.trim().toLocaleLowerCase('pt-BR');
+      const existing = (existingResult.data || []).find((row) => normalizeProductName(String(row.name || '')).trim().toLocaleLowerCase('pt-BR') === normalizedName && String(row.color || '').trim().toLocaleLowerCase('pt-BR') === normalizedColor);
+      if (existing) {
+        const existingSizesResult = await supabase.from('product_sizes').select('id,size,quantity').eq('product_id', existing.id);
+        if (existingSizesResult.error) { setActionMessage('Não foi possível carregar os tamanhos já cadastrados para este modelo.'); return; }
+        const quantitiesByValue = new Map<number, number>((existingSizesResult.data || []).map((row) => [Number(row.size), Number(row.quantity || 0)]));
+        sizeRows.forEach((row) => quantitiesByValue.set(row.size, row.quantity));
+        const mergedRows = Array.from(quantitiesByValue, ([size, quantity]) => ({ product_id: existing.id, size, quantity }));
+        if (mergedRows.some((row) => !row.size)) { setActionMessage('Selecione uma numeração válida para este produto.'); return; }
+        const sizesResult = mergedRows.length ? await supabase.from('product_sizes').upsert(mergedRows, { onConflict: 'product_id,size' }) : null;
+        if (sizesResult?.error) { setActionMessage('Não foi possível adicionar a nova numeração ao produto.'); return; }
+        const mergedImageValue = imageFile ? imageValue : existing.image_url || imageValue;
+        const update = await supabase.from('products').update({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: mergedImageValue, is_active: form.isActive }).eq('id', existing.id);
+        if (update.error) { setActionMessage('Os tamanhos foram preparados, mas não foi possível atualizar os dados do produto.'); return; }
+        const previousQuantities = Object.fromEntries((existingSizesResult.data || []).map((row) => [getOptionsForCategory(form.category).find((option) => option.values.includes(Number(row.size)))?.label || String(row.size), Number(row.quantity || 0)]));
+        const nextQuantities = Object.fromEntries(mergedRows.map((row) => [getOptionsForCategory(form.category).find((option) => option.values.includes(row.size))?.label || String(row.size), row.quantity]));
+        await logStockChanges(existing.id, form.name.trim(), previousQuantities, nextQuantities, 'Cadastro de numeração');
+        const parsedImage = parseImageUrl(mergedImageValue);
+        const nextItem = { id: existing.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || '', price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: mergedRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: Object.keys(nextQuantities).filter((label) => Number(nextQuantities[label]) > 0), sizeQuantities: nextQuantities, description: form.description.trim(), image: parsedImage.src, imageAdjust: parsedImage.adjust, createdAt: existing.created_at || '' };
+        setItems((current) => current.map((item) => item.id === existing.id ? nextItem : item));
+        activityAction = 'Edição';
+        activityProductId = existing.id;
+        activityDescription = `Numeração adicionada ao produto ${form.name.trim()}.`;
+        customSuccessMessage = `Este modelo já existia. A numeração foi adicionada ao cadastro de ${form.name.trim()}.`;
+      } else {
+        const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id,created_at').single();
+        if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
+        const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
+        if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
+        await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
+        setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
+      }
     } else {
       const localId = editingProductId || crypto.randomUUID();
       const nextItem = { id: localId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes, sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || form.image, imageAdjust: form.imageAdjust };
       setItems((current) => editingProductId ? current.map((item) => item.id === editingProductId ? nextItem : item) : [nextItem, ...current]);
     }
-    void createActivityLog(editingProductId ? 'Edição' : 'Criação', 'Produto', `${editingProductId ? 'Produto atualizado' : 'Produto cadastrado'}: ${form.name.trim()}.`, editingProductId, { category: form.category, color: form.color.trim(), price: numericPrice });
-    setActionMessage(editingProductId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.');
+    void createActivityLog(activityAction, 'Produto', activityDescription, activityProductId, { category: form.category, color: form.color.trim(), price: numericPrice });
+    setActionMessage(customSuccessMessage || (editingProductId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.'));
     resetProductForm();
     setShowForm(false);
   }
