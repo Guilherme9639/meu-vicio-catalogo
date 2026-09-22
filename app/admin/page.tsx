@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, SyntheticEvent, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Copy, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
+import { Activity, ArrowDown, ArrowLeft, ArrowUp, BarChart3, Bell, Check, ChevronDown, Eye, EyeOff, Heart, ImagePlus, LayoutDashboard, LogOut, MoreHorizontal, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Tags, Trash2, Upload, X } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_IMAGE_ADJUST, parseImageUrl, serializeImageUrl, type ImageAdjust } from '@/lib/image-adjust';
@@ -259,14 +259,6 @@ export default function AdminPage() {
     void loadActivityLogs();
     return () => { mounted = false; };
   }, [session, adminAuthorized]);
-  useEffect(() => {
-    const options = categorySizeOptions[form.category] || defaultOptionsForCategory(form.category);
-    setForm((current) => {
-      const sizes = current.sizes.filter((label) => options.some((option) => option.label === label));
-      if (sizes.length === current.sizes.length) return current;
-      return { ...current, sizes, quantities: Object.fromEntries(sizes.map((label) => [label, current.quantities[label] ?? 1])) };
-    });
-  }, [form.category, categorySizeOptions]);
   const visibleItems = useMemo(() => {
     const categoryOrder = new Map(categories.map((category, index) => [category.name.toLocaleLowerCase(), index]));
     return items
@@ -305,7 +297,6 @@ export default function AdminPage() {
   function resetProductForm() { setEditingProductId(null); setImageFile(null); setForm({ name: '', category: categories[0]?.name || 'Adulto', color: '', tag: '', price: '', description: '', isActive: true, sizes: [], quantities: {}, image: '/products/havaianas-branco.png', imageAdjust: DEFAULT_IMAGE_ADJUST }); }
   function openNewProduct() { setActionMessage(''); resetProductForm(); setShowForm(true); }
   function openEditProduct(item: AdminProduct) { setActionMessage(''); setEditingProductId(item.id); setImageFile(null); setForm({ name: item.name, category: item.category, color: item.color || '', tag: item.tag || '', price: item.price.replace('R$', '').trim(), description: item.description || '', isActive: item.status === 'Ativo', sizes: item.sizes, quantities: item.sizeQuantities || Object.fromEntries(item.sizes.map((size) => [size, 1])), image: item.image, imageAdjust: item.imageAdjust || DEFAULT_IMAGE_ADJUST }); setShowForm(true); }
-  function openDuplicateProduct(item: AdminProduct) { setActionMessage(`Duplicando ${item.name}. Escolha a categoria e as numerações do novo cadastro.`); setEditingProductId(null); setImageFile(null); setForm({ name: item.name, category: item.category, color: item.color || '', tag: item.tag || '', price: item.price.replace('R$', '').trim(), description: item.description || '', isActive: item.status === 'Ativo', sizes: item.sizes, quantities: item.sizeQuantities || Object.fromEntries(item.sizes.map((size) => [size, 1])), image: item.image, imageAdjust: item.imageAdjust || DEFAULT_IMAGE_ADJUST }); setShowForm(true); }
   async function moveProduct(item: AdminProduct, direction: -1 | 1) {
     const categoryItems = items
       .filter((current) => current.category === item.category)
@@ -509,10 +500,6 @@ export default function AdminPage() {
     if (!form.name.trim() || !form.price.trim()) { setActionMessage('Preencha o nome e o preço do produto.'); return; }
     const previousItem = editingProductId ? items.find((item) => item.id === editingProductId) : undefined;
     const numericPrice = parsePrice(form.price);
-    let activityAction = editingProductId ? 'Edição' : 'Criação';
-    let activityProductId = editingProductId;
-    let activityDescription = `${editingProductId ? 'Produto atualizado' : 'Produto cadastrado'}: ${form.name.trim()}.`;
-    let customSuccessMessage = '';
     let imageUrl: string | null = form.image.startsWith('blob:') ? null : form.image;
     if (imageFile && supabase && session) {
       const path = `${crypto.randomUUID()}-${imageFile.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-')}`;
@@ -536,48 +523,19 @@ export default function AdminPage() {
       await logStockChanges(editingProductId, form.name.trim(), previousItem?.sizeQuantities || {}, nextItem.sizeQuantities, 'Ajuste manual');
       setItems((current) => current.map((item) => item.id === editingProductId ? nextItem : item));
     } else if (supabase && session) {
-      const existingResult = await supabase.from('products').select('id,name,category,color,tag,price,description,image_url,is_active,created_at').eq('category', form.category).ilike('name', form.name.trim()).limit(20);
-      if (existingResult.error) { setActionMessage('Não foi possível verificar se este modelo já está cadastrado.'); return; }
-      const normalizedName = normalizeProductName(form.name.trim()).trim().toLocaleLowerCase('pt-BR');
-      const normalizedColor = form.color.trim().toLocaleLowerCase('pt-BR');
-      const existing = (existingResult.data || []).find((row) => normalizeProductName(String(row.name || '')).trim().toLocaleLowerCase('pt-BR') === normalizedName && String(row.color || '').trim().toLocaleLowerCase('pt-BR') === normalizedColor);
-      if (existing) {
-        const existingSizesResult = await supabase.from('product_sizes').select('id,size,quantity').eq('product_id', existing.id);
-        if (existingSizesResult.error) { setActionMessage('Não foi possível carregar os tamanhos já cadastrados para este modelo.'); return; }
-        const quantitiesByValue = new Map<number, number>((existingSizesResult.data || []).map((row) => [Number(row.size), Number(row.quantity || 0)]));
-        sizeRows.forEach((row) => quantitiesByValue.set(row.size, row.quantity));
-        const mergedRows = Array.from(quantitiesByValue, ([size, quantity]) => ({ product_id: existing.id, size, quantity }));
-        if (mergedRows.some((row) => !row.size)) { setActionMessage('Selecione uma numeração válida para este produto.'); return; }
-        const sizesResult = mergedRows.length ? await supabase.from('product_sizes').upsert(mergedRows, { onConflict: 'product_id,size' }) : null;
-        if (sizesResult?.error) { setActionMessage('Não foi possível adicionar a nova numeração ao produto.'); return; }
-        const mergedImageValue = imageFile ? imageValue : existing.image_url || imageValue;
-        const update = await supabase.from('products').update({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: mergedImageValue, is_active: form.isActive }).eq('id', existing.id);
-        if (update.error) { setActionMessage('Os tamanhos foram preparados, mas não foi possível atualizar os dados do produto.'); return; }
-        const previousQuantities = Object.fromEntries((existingSizesResult.data || []).map((row) => [getOptionsForCategory(form.category).find((option) => option.values.includes(Number(row.size)))?.label || String(row.size), Number(row.quantity || 0)]));
-        const nextQuantities = Object.fromEntries(mergedRows.map((row) => [getOptionsForCategory(form.category).find((option) => option.values.includes(row.size))?.label || String(row.size), row.quantity]));
-        await logStockChanges(existing.id, form.name.trim(), previousQuantities, nextQuantities, 'Cadastro de numeração');
-        const parsedImage = parseImageUrl(mergedImageValue);
-        const nextItem = { id: existing.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || '', price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: mergedRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: Object.keys(nextQuantities).filter((label) => Number(nextQuantities[label]) > 0), sizeQuantities: nextQuantities, description: form.description.trim(), image: parsedImage.src, imageAdjust: parsedImage.adjust, createdAt: existing.created_at || '' };
-        setItems((current) => current.map((item) => item.id === existing.id ? nextItem : item));
-        activityAction = 'Edição';
-        activityProductId = existing.id;
-        activityDescription = `Numeração adicionada ao produto ${form.name.trim()}.`;
-        customSuccessMessage = `Este modelo já existia. A numeração foi adicionada ao cadastro de ${form.name.trim()}.`;
-      } else {
-        const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id,created_at').single();
-        if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
-        const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
-        if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
-        await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
-        setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
-      }
+      const inserted = await supabase.from('products').insert({ name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag || null, price: numericPrice, description: form.description.trim(), image_url: imageValue, is_active: form.isActive }).select('id,created_at').single();
+      if (inserted.error || !inserted.data) { setActionMessage('Não foi possível salvar o produto.'); return; }
+      const sizes = sizeRows.map((row) => ({ ...row, product_id: inserted.data.id }));
+      if (sizes.length) { const sizeResult = await supabase.from('product_sizes').insert(sizes); if (sizeResult.error) { setActionMessage('Produto salvo, mas não foi possível salvar os tamanhos.'); return; } }
+      await logStockChanges(inserted.data.id, form.name.trim(), {}, Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), 'Cadastro inicial');
+      setItems((current) => [{ id: inserted.data.id, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes.filter((label) => (form.quantities[label] ?? 0) > 0), sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || '/products/havaianas-branco.png', imageAdjust: form.imageAdjust, createdAt: inserted.data.created_at || '' }, ...current]);
     } else {
       const localId = editingProductId || crypto.randomUUID();
       const nextItem = { id: localId, name: form.name.trim(), category: form.category, color: form.color.trim(), tag: form.tag, price: numericPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), stock: sizeRows.reduce((total, row) => total + row.quantity, 0), status: form.isActive ? 'Ativo' as const : 'Rascunho' as const, sizes: form.sizes, sizeQuantities: Object.fromEntries(form.sizes.map((label) => [label, form.quantities[label] ?? 0])), description: form.description.trim(), image: imageUrl || form.image, imageAdjust: form.imageAdjust };
       setItems((current) => editingProductId ? current.map((item) => item.id === editingProductId ? nextItem : item) : [nextItem, ...current]);
     }
-    void createActivityLog(activityAction, 'Produto', activityDescription, activityProductId, { category: form.category, color: form.color.trim(), price: numericPrice });
-    setActionMessage(customSuccessMessage || (editingProductId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.'));
+    void createActivityLog(editingProductId ? 'Edição' : 'Criação', 'Produto', `${editingProductId ? 'Produto atualizado' : 'Produto cadastrado'}: ${form.name.trim()}.`, editingProductId, { category: form.category, color: form.color.trim(), price: numericPrice });
+    setActionMessage(editingProductId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.');
     resetProductForm();
     setShowForm(false);
   }
@@ -857,7 +815,7 @@ export default function AdminPage() {
         <div className="admin-section-head" id="produtos"><div><span className="admin-kicker">catálogo</span><h2>Produtos cadastrados</h2></div><div className="admin-head-actions"><button type="button" className="import-button" onClick={() => setImportNotice(true)}><Upload size={16} /> Orientações da carga</button><button type="button" className="new-product-button" onClick={openNewProduct}><Plus size={17} /> Novo produto</button></div></div>
         <div className="admin-order-note"><ArrowUp size={15} /><span>Use as setas em cada produto para definir a ordem dentro da categoria. Essa sequência também vale quando o cliente filtrar por tamanho.</span></div>
         <div className="admin-toolbar"><div className="admin-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nome do produto" /></div><label className="status-filter"><span>Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'Todos' | 'Ativo' | 'Rascunho')}><option>Todos</option><option>Ativo</option><option>Rascunho</option></select><ChevronDown size={15} /></label></div>
-        <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Cor</th><th>Preço</th><th>Estoque total</th><th>Tamanhos com estoque</th><th>Status</th><th></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}><td><div className="table-product"><button type="button" className="table-product-image-button" onClick={() => setPreviewImage({ src: item.image, name: item.name })} aria-label={`Visualizar foto de ${item.name}`}><img src={item.image} alt="" /></button><strong>{item.name}</strong></div></td><td>{item.category}</td><td>{item.color || 'Não informada'}</td><td className="table-price">{item.price}</td><td><strong>{item.stock}</strong> pares</td><td><div className="table-sizes">{item.sizes.slice(0, 5).map((size) => <span key={size}>{size}</span>)}{item.sizes.length > 5 && <span>+{item.sizes.length - 5}</span>}</div></td><td><span className={item.status === 'Ativo' ? 'status active' : 'status draft'}><i />{item.status}</span></td><td><div className="row-actions"><button className="row-menu" type="button" onClick={() => moveProduct(item, -1)} disabled={!canMoveProduct(item, -1)} aria-label={`Mover ${item.name} para cima`} title="Mover para cima"><ArrowUp size={16} /></button><button className="row-menu" type="button" onClick={() => moveProduct(item, 1)} disabled={!canMoveProduct(item, 1)} aria-label={`Mover ${item.name} para baixo`} title="Mover para baixo"><ArrowDown size={16} /></button><button className="row-menu" type="button" onClick={() => openDuplicateProduct(item)} aria-label={`Duplicar ${item.name}`} title="Duplicar produto"><Copy size={16} /></button><button className="row-menu" type="button" onClick={() => openEditProduct(item)} aria-label={`Editar ${item.name}`} title="Editar produto"><MoreHorizontal size={18} /></button><button className="row-menu" type="button" onClick={() => toggleProductStatus(item)} aria-label={`${item.status === 'Ativo' ? 'Colocar' : 'Ativar'} ${item.name} como ${item.status === 'Ativo' ? 'rascunho' : 'ativo'}`} title={item.status === 'Ativo' ? 'Colocar como rascunho' : 'Ativar produto'}>{item.status === 'Ativo' ? <EyeOff size={16} /> : <Eye size={16} />}</button><button className="row-menu row-menu-danger" type="button" onClick={() => deleteProduct(item)} aria-label={`Excluir ${item.name}`} title="Excluir produto"><Trash2 size={16} /></button></div></td></tr>)}</tbody></table></div>
+        <div className="products-table-wrap"><table className="products-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Cor</th><th>Preço</th><th>Estoque total</th><th>Tamanhos com estoque</th><th>Status</th><th></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}><td><div className="table-product"><button type="button" className="table-product-image-button" onClick={() => setPreviewImage({ src: item.image, name: item.name })} aria-label={`Visualizar foto de ${item.name}`}><img src={item.image} alt="" /></button><strong>{item.name}</strong></div></td><td>{item.category}</td><td>{item.color || 'Não informada'}</td><td className="table-price">{item.price}</td><td><strong>{item.stock}</strong> pares</td><td><div className="table-sizes">{item.sizes.slice(0, 5).map((size) => <span key={size}>{size}</span>)}{item.sizes.length > 5 && <span>+{item.sizes.length - 5}</span>}</div></td><td><span className={item.status === 'Ativo' ? 'status active' : 'status draft'}><i />{item.status}</span></td><td><div className="row-actions"><button className="row-menu" type="button" onClick={() => moveProduct(item, -1)} disabled={!canMoveProduct(item, -1)} aria-label={`Mover ${item.name} para cima`} title="Mover para cima"><ArrowUp size={16} /></button><button className="row-menu" type="button" onClick={() => moveProduct(item, 1)} disabled={!canMoveProduct(item, 1)} aria-label={`Mover ${item.name} para baixo`} title="Mover para baixo"><ArrowDown size={16} /></button><button className="row-menu" type="button" onClick={() => openEditProduct(item)} aria-label={`Editar ${item.name}`} title="Editar produto"><MoreHorizontal size={18} /></button><button className="row-menu" type="button" onClick={() => toggleProductStatus(item)} aria-label={`${item.status === 'Ativo' ? 'Colocar' : 'Ativar'} ${item.name} como ${item.status === 'Ativo' ? 'rascunho' : 'ativo'}`} title={item.status === 'Ativo' ? 'Colocar como rascunho' : 'Ativar produto'}>{item.status === 'Ativo' ? <EyeOff size={16} /> : <Eye size={16} />}</button><button className="row-menu row-menu-danger" type="button" onClick={() => deleteProduct(item)} aria-label={`Excluir ${item.name}`} title="Excluir produto"><Trash2 size={16} /></button></div></td></tr>)}</tbody></table></div>
         <div className="admin-help-card"><div className="help-illustration"><ImagePlus size={27} /></div><div><span className="admin-kicker">próximo passo</span><h3>Cadastre os produtos da loja</h3><p>Use o botão de novo produto para adicionar fotos, categorias, preços e estoque separado por tamanho.</p></div><button type="button" className="secondary-admin-button" onClick={openNewProduct}>Cadastrar produto <Plus size={15} /></button></div>
         <section id="categorias" style={{ marginTop: 34, borderTop: '1px solid #e4ece8', paddingTop: 4 }}>
           <div className="admin-section-head"><div><span className="admin-kicker">organização</span><h2>Categorias</h2></div><span className="admin-breadcrumb">{categories.length} cadastradas</span></div>

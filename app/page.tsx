@@ -24,6 +24,7 @@ import {
   type ImageAdjust,
 } from '@/lib/image-adjust';
 import { normalizeProductName, productCategoryLabel } from '@/lib/catalog-text';
+import { readBrowserCache, writeBrowserCache } from '@/lib/browser-cache';
 
 type Product = {
   id: string;
@@ -50,6 +51,15 @@ type StoreSettings = {
   whatsappMessage: string;
 };
 type PersonalizationImage = { src: string; alt: string };
+type CatalogCachePayload = {
+  data: Array<Record<string, unknown>>;
+  categoryRows: Array<Record<string, unknown>>;
+  categorySizeRows: Array<Record<string, unknown>>;
+};
+
+const PUBLIC_CACHE_TTL_MS = 60_000;
+const CATALOG_CACHE_KEY = 'meu-vicio-public-catalog-v1';
+const SETTINGS_CACHE_KEY = 'meu-vicio-store-settings-v1';
 
 const DEFAULT_STORE_SETTINGS: StoreSettings = {
   storeName: 'Meu Vício',
@@ -638,76 +648,50 @@ export default function Home() {
     let mounted = true;
     async function loadCatalog() {
       if (!supabase) return;
-      const [{ data }, { data: categoryRows }, { data: categorySizeRows }] =
-        await Promise.all([
-        supabase
-          .from('products')
-          .select(
-            'id,name,category,color,tag,price,description,image_url,product_sizes(size,quantity)',
-          )
-          .eq('is_active', true)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('id,name')
-          .order('name', { ascending: true }),
-        supabase
-          .from('category_sizes')
-          .select('category_id,size_label,size_values,sort_order')
-          .order('sort_order', { ascending: true }),
-      ]);
-      if (!mounted) return;
-      const categoryNamesById = new Map(
-        (categoryRows || []).map((row: { id: string; name: string }) => [
-          row.id,
-          row.name,
-        ]),
-      );
+      const applyCatalog = (payload: CatalogCachePayload) => {
+        const categoryNamesById = new Map(
+          payload.categoryRows.map((row) => [
+            String(row.id),
+            String(row.name || ''),
+          ]),
+        );
       const customCategoryOptions: Record<string, SizeOption[]> = {};
-      (categorySizeRows || []).forEach(
-        (row: {
-          category_id: string;
-          size_label: string;
-          size_values: number[];
-        }) => {
-          const name = categoryNamesById.get(row.category_id);
+        payload.categorySizeRows.forEach((row) => {
+          const name = categoryNamesById.get(String(row.category_id));
           if (!name) return;
           const values = Array.isArray(row.size_values)
             ? row.size_values.map(Number).filter(Number.isFinite)
             : [];
           if (!values.length || !row.size_label) return;
           (customCategoryOptions[name] ||= []).push({
-            label: row.size_label,
+            label: String(row.size_label),
             values,
           });
-        },
-      );
+        });
       const mergedCategoryOptions: Record<string, SizeOption[]> = {
         Adulto: adultSizeOptions,
         Infantil: infantSizeOptions,
         ...customCategoryOptions,
       };
       setCategorySizeOptions(mergedCategoryOptions);
-      const nextProducts = (data || []).map((row) => {
+      const nextProducts = payload.data.map((row) => {
         const image = parseImageUrl(row.image_url);
         const productCategory = String(row.category || 'Adulto');
         return {
-          id: row.id,
-          name: normalizeProductName(row.name),
+          id: String(row.id),
+          name: normalizeProductName(String(row.name || '')),
           category: productCategory,
-          color: row.color || 'Sem cor',
-          tag: row.tag || undefined,
+          color: String(row.color || 'Sem cor'),
+          tag: row.tag ? String(row.tag) : undefined,
           price: Number(row.price),
-          description: row.description || 'Confira os detalhes deste modelo.',
+          description: String(row.description || 'Confira os detalhes deste modelo.'),
           image: image.src,
           imageAdjust: image.adjust,
           sizes: Object.fromEntries(
-            (row.product_sizes || []).map(
-              (item: { size: number; quantity: number }) => [
-                item.size,
-                item.quantity,
-              ],
-            ),
+            (Array.isArray(row.product_sizes) ? row.product_sizes : []).map((item) => {
+              const sizeRow = item as { size: number; quantity: number };
+              return [sizeRow.size, sizeRow.quantity];
+            }),
           ),
           sizeOptions:
             mergedCategoryOptions[productCategory] ||
@@ -716,9 +700,7 @@ export default function Home() {
       });
       setCatalogProducts(nextProducts);
       const available = new Map<string, string>();
-      [...(categoryRows || []).map((row: { name?: string }) =>
-        String(row.name || '').trim(),
-      ), ...nextProducts.map((product) => product.category)].forEach((name) => {
+      [...payload.categoryRows.map((row) => String(row.name || '').trim()), ...nextProducts.map((product) => product.category)].forEach((name) => {
         const normalizedName = name.toLocaleLowerCase();
         if (name && !available.has(normalizedName)) {
           available.set(normalizedName, name);
@@ -728,6 +710,43 @@ export default function Home() {
         Array.from(available.values()).sort((a, b) => a.localeCompare(b)),
       );
       setCatalogLoading(false);
+      };
+
+      const cached = readBrowserCache<CatalogCachePayload>(
+        CATALOG_CACHE_KEY,
+        PUBLIC_CACHE_TTL_MS,
+      );
+      if (cached) {
+        applyCatalog(cached);
+        return;
+      }
+
+      const [productsResult, categoriesResult, categorySizesResult] =
+        await Promise.all([
+          supabase
+            .from('products')
+            .select(
+              'id,name,category,color,tag,price,description,image_url,product_sizes(size,quantity)',
+            )
+            .eq('is_active', true)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('categories')
+            .select('id,name')
+            .order('name', { ascending: true }),
+          supabase
+            .from('category_sizes')
+            .select('category_id,size_label,size_values,sort_order')
+            .order('sort_order', { ascending: true }),
+        ]);
+      if (!mounted) return;
+      const payload: CatalogCachePayload = {
+        data: (productsResult.data || []) as Array<Record<string, unknown>>,
+        categoryRows: (categoriesResult.data || []) as Array<Record<string, unknown>>,
+        categorySizeRows: (categorySizesResult.data || []) as Array<Record<string, unknown>>,
+      };
+      writeBrowserCache(CATALOG_CACHE_KEY, payload);
+      applyCatalog(payload);
     }
     void loadCatalog();
     return () => {
@@ -738,6 +757,14 @@ export default function Home() {
     let mounted = true;
     async function loadSettings() {
       if (!supabase) return;
+      const cached = readBrowserCache<StoreSettings>(
+        SETTINGS_CACHE_KEY,
+        PUBLIC_CACHE_TTL_MS,
+      );
+      if (cached) {
+        setSettings(cached);
+        return;
+      }
       const { data } = await supabase
         .from('store_settings')
         .select(
@@ -746,7 +773,7 @@ export default function Home() {
         .eq('id', 'default')
         .maybeSingle();
       if (!mounted || !data) return;
-      setSettings({
+      const nextSettings = {
         storeName: data.store_name,
         hours: data.hours,
         whatsappPrimary: data.whatsapp_primary,
@@ -754,7 +781,9 @@ export default function Home() {
         whatsappSecondary: data.whatsapp_secondary,
         whatsappSecondaryLabel: data.whatsapp_secondary_label,
         whatsappMessage: data.whatsapp_message,
-      });
+      };
+      writeBrowserCache(SETTINGS_CACHE_KEY, nextSettings);
+      setSettings(nextSettings);
     }
     void loadSettings();
     return () => {
@@ -1410,6 +1439,8 @@ export default function Home() {
                         style={imageAdjustStyle(product.imageAdjust)}
                         src={product.image}
                         alt={`${product.name} - ${product.color}`}
+                        loading="lazy"
+                        decoding="async"
                       />
                     </button>
                     <span className="product-color-dot" title={product.color} />
