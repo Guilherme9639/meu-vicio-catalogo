@@ -155,6 +155,8 @@ a { color: inherit; text-decoration: none; }
 .product-image img { position: relative; z-index: 1; height: auto; width: auto; max-height: 78%; max-width: 78%; object-fit: contain; object-position: center; transition: transform .35s ease; }
 .product-image-open { position: relative; z-index: 1; display: grid; height: 100%; width: 100%; place-items: center; border: 0; background: transparent; cursor: zoom-in; }
 .product-image-open:focus-visible { outline: 2px solid var(--deep-coral); outline-offset: -4px; }
+.backup-image-placeholder { position: relative; z-index: 1; display: flex; height: 100%; width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px; color: #777; font-size: 11px; text-align: center; }
+.backup-image-placeholder svg { color: #a59b93; }
 .product-card:hover .product-image img { transform: scale(1.05) rotate(-2deg); }
 .product-tag { position: absolute; z-index: 3; left: 12px; top: 12px; border-radius: 99px; background: #2e6150; color: #f4fbf6; padding: 5px 9px; font-size: 9px; font-weight: 800; letter-spacing: .05em; }
 .product-heart { position: absolute; z-index: 3; right: 10px; top: 10px; display: grid; height: 31px; width: 31px; place-items: center; border: 1px solid rgba(160, 122, 103, .24); border-radius: 50%; background: rgba(255,250,245,.78); color: #8e6e60; cursor: pointer; }

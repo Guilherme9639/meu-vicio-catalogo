@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Filter,
   Heart,
+  ImageOff,
   Menu,
   MessageCircle,
   Minus,
@@ -38,6 +39,7 @@ type Product = {
   sizes: Record<number, number>;
   sizeOptions?: SizeOption[];
   tag?: string;
+  registeredSizes?: string[];
 };
 type SizeOption = { label: string; values: number[] };
 type CartItem = Product & { selectedSize: string; quantity: number };
@@ -56,9 +58,24 @@ type CatalogCachePayload = {
   categoryRows: Array<Record<string, unknown>>;
   categorySizeRows: Array<Record<string, unknown>>;
 };
+type BackupCatalogPayload = {
+  exportedAt: string;
+  categories: string[];
+  whatsappPrimary?: string;
+  categoryOptions: Record<string, SizeOption[]>;
+  products: Array<{
+    id: string;
+    name: string;
+    category: string;
+    color: string;
+    tag?: string;
+    description: string;
+    sizes: string[];
+  }>;
+};
 
 const PUBLIC_CACHE_TTL_MS = 60_000;
-const CATALOG_CACHE_KEY = 'meu-vicio-public-catalog-v1';
+const CATALOG_CACHE_KEY = 'meu-vicio-public-catalog-v2';
 const SETTINGS_CACHE_KEY = 'meu-vicio-store-settings-v1';
 
 const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -310,6 +327,7 @@ function StoreHeader({
   categories,
   selectedCategory,
   cartCount,
+  readOnlyCatalog,
   setCartOpen,
   favoritesCount,
   showFavoritesOnly,
@@ -325,6 +343,7 @@ function StoreHeader({
   categories: string[];
   selectedCategory: string;
   cartCount: number;
+  readOnlyCatalog: boolean;
   setCartOpen: (open: boolean) => void;
   favoritesCount: number;
   showFavoritesOnly: boolean;
@@ -454,15 +473,17 @@ function StoreHeader({
                 <span className="favorite-count">{favoritesCount}</span>
               )}
             </button>
-            <button
-              className="cart-button"
-              type="button"
-              onClick={() => setCartOpen(true)}
-            >
-              <ShoppingBag size={18} strokeWidth={2} />
-              <span className="hidden sm:inline">Sacola</span>
-              <span className="cart-count">{cartCount}</span>
-            </button>
+            {!readOnlyCatalog && (
+              <button
+                className="cart-button"
+                type="button"
+                onClick={() => setCartOpen(true)}
+              >
+                <ShoppingBag size={18} strokeWidth={2} />
+                <span className="hidden sm:inline">Sacola</span>
+                <span className="cart-count">{cartCount}</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="site-tools mx-auto max-w-[1240px] px-5 pb-3 lg:px-8">
@@ -572,6 +593,7 @@ export default function Home() {
     Record<string, SizeOption[]>
   >({ Adulto: adultSizeOptions, Infantil: infantSizeOptions });
   const [catalogLoading, setCatalogLoading] = useState(Boolean(supabase));
+  const [usingBackupCatalog, setUsingBackupCatalog] = useState(false);
   const [settings, setSettings] = useState<StoreSettings>(
     DEFAULT_STORE_SETTINGS,
   );
@@ -647,69 +669,87 @@ export default function Home() {
   useEffect(() => {
     let mounted = true;
     async function loadCatalog() {
-      if (!supabase) return;
       const applyCatalog = (payload: CatalogCachePayload) => {
+        setUsingBackupCatalog(false);
         const categoryNamesById = new Map(
           payload.categoryRows.map((row) => [
             String(row.id),
-            String(row.name || ''),
+            typeof row.name === 'string' ? row.name : '',
           ]),
         );
-      const customCategoryOptions: Record<string, SizeOption[]> = {};
+        const customCategoryOptions: Record<string, SizeOption[]> = {};
         payload.categorySizeRows.forEach((row) => {
           const name = categoryNamesById.get(String(row.category_id));
           if (!name) return;
           const values = Array.isArray(row.size_values)
             ? row.size_values.map(Number).filter(Number.isFinite)
             : [];
-          if (!values.length || !row.size_label) return;
+          if (!values.length || typeof row.size_label !== 'string') return;
           (customCategoryOptions[name] ||= []).push({
-            label: String(row.size_label),
+            label: row.size_label,
             values,
           });
         });
-      const mergedCategoryOptions: Record<string, SizeOption[]> = {
-        Adulto: adultSizeOptions,
-        Infantil: infantSizeOptions,
-        ...customCategoryOptions,
-      };
-      setCategorySizeOptions(mergedCategoryOptions);
-      const nextProducts = payload.data.map((row) => {
-        const image = parseImageUrl(row.image_url);
-        const productCategory = String(row.category || 'Adulto');
-        return {
-          id: String(row.id),
-          name: normalizeProductName(String(row.name || '')),
-          category: productCategory,
-          color: String(row.color || 'Sem cor'),
-          tag: row.tag ? String(row.tag) : undefined,
-          price: Number(row.price),
-          description: String(row.description || 'Confira os detalhes deste modelo.'),
-          image: image.src,
-          imageAdjust: image.adjust,
-          sizes: Object.fromEntries(
-            (Array.isArray(row.product_sizes) ? row.product_sizes : []).map((item) => {
-              const sizeRow = item as { size: number; quantity: number };
-              return [sizeRow.size, sizeRow.quantity];
-            }),
-          ),
-          sizeOptions:
-            mergedCategoryOptions[productCategory] ||
-            defaultOptionsForCategory(productCategory),
+        const mergedCategoryOptions: Record<string, SizeOption[]> = {
+          Adulto: adultSizeOptions,
+          Infantil: infantSizeOptions,
+          ...customCategoryOptions,
         };
-      });
-      setCatalogProducts(nextProducts);
-      const available = new Map<string, string>();
-      [...payload.categoryRows.map((row) => String(row.name || '').trim()), ...nextProducts.map((product) => product.category)].forEach((name) => {
-        const normalizedName = name.toLocaleLowerCase();
-        if (name && !available.has(normalizedName)) {
-          available.set(normalizedName, name);
-        }
-      });
-      setCatalogCategories(
-        Array.from(available.values()).sort((a, b) => a.localeCompare(b)),
-      );
-      setCatalogLoading(false);
+        setCategorySizeOptions(mergedCategoryOptions);
+        const nextProducts = payload.data.map((row) => {
+          const image = parseImageUrl(
+            typeof row.image_url === 'string' ? row.image_url : undefined,
+          );
+          const productCategory =
+            typeof row.category === 'string' ? row.category : 'Adulto';
+          return {
+            id: String(row.id),
+            name: normalizeProductName(
+              typeof row.name === 'string' ? row.name : '',
+            ),
+            category: productCategory,
+            color: typeof row.color === 'string' ? row.color : 'Sem cor',
+            tag: typeof row.tag === 'string' ? row.tag : undefined,
+            price: Number(row.price),
+            description:
+              typeof row.description === 'string'
+                ? row.description
+                : 'Confira os detalhes deste modelo.',
+            image: image.src,
+            imageAdjust: image.adjust,
+            sizes: Object.fromEntries(
+              (Array.isArray(row.product_sizes) ? row.product_sizes : []).map(
+                (item) => {
+                  const sizeRow = item as {
+                    size: number;
+                    quantity: number;
+                  };
+                  return [sizeRow.size, sizeRow.quantity];
+                },
+              ),
+            ),
+            sizeOptions:
+              mergedCategoryOptions[productCategory] ||
+              defaultOptionsForCategory(productCategory),
+          };
+        });
+        setCatalogProducts(nextProducts);
+        const available = new Map<string, string>();
+        [
+          ...payload.categoryRows.map((row) =>
+            typeof row.name === 'string' ? row.name.trim() : '',
+          ),
+          ...nextProducts.map((product) => product.category),
+        ].forEach((name) => {
+          const normalizedName = name.toLocaleLowerCase();
+          if (name && !available.has(normalizedName)) {
+            available.set(normalizedName, name);
+          }
+        });
+        setCatalogCategories(
+          Array.from(available.values()).sort((a, b) => a.localeCompare(b)),
+        );
+        setCatalogLoading(false);
       };
 
       const cached = readBrowserCache<CatalogCachePayload>(
@@ -721,8 +761,55 @@ export default function Home() {
         return;
       }
 
+      const applyBackupCatalog = async () => {
+        const response = await fetch('/catalogo-temporario.json', {
+          cache: 'no-store',
+        });
+        if (!response.ok) {
+          throw new Error('Não foi possível carregar o catálogo temporário.');
+        }
+        const payload = (await response.json()) as BackupCatalogPayload;
+        if (!mounted) return;
+        const optionsByCategory = payload.categoryOptions || {};
+        const nextProducts: Product[] = payload.products.map((row) => {
+          const sizeOptions = optionsByCategory[row.category] || [];
+          const sizes = Object.fromEntries(
+            row.sizes.flatMap((label) => {
+              const option = sizeOptions.find((item) => item.label === label);
+              return (option?.values || []).map((value) => [value, 1]);
+            }),
+          );
+          return {
+            ...row,
+            price: 0,
+            image: '/products/havaianas-branco.png',
+            imageAdjust: DEFAULT_IMAGE_ADJUST,
+            sizes,
+            sizeOptions,
+            registeredSizes: row.sizes,
+          };
+        });
+        setUsingBackupCatalog(true);
+        setCatalogProducts(nextProducts);
+        setCatalogCategories(payload.categories);
+        setCategorySizeOptions(optionsByCategory);
+        if (payload.whatsappPrimary) {
+          setSettings((current) => ({
+            ...current,
+            whatsappPrimary: payload.whatsappPrimary!,
+            whatsappPrimaryLabel: 'Atendimento da loja',
+          }));
+        }
+        setCatalogLoading(false);
+      };
+
+      if (!supabase) {
+        await applyBackupCatalog();
+        return;
+      }
+
       const [productsResult, categoriesResult, categorySizesResult] =
-        await Promise.all([
+        (await Promise.all([
           supabase
             .from('products')
             .select(
@@ -738,8 +825,20 @@ export default function Home() {
             .from('category_sizes')
             .select('category_id,size_label,size_values,sort_order')
             .order('sort_order', { ascending: true }),
-        ]);
+        ]).catch(() => null)) || [];
       if (!mounted) return;
+      if (!productsResult || !categoriesResult || !categorySizesResult) {
+        await applyBackupCatalog();
+        return;
+      }
+      if (
+        productsResult.error ||
+        categoriesResult.error ||
+        categorySizesResult.error
+      ) {
+        await applyBackupCatalog();
+        return;
+      }
       const payload: CatalogCachePayload = {
         data: (productsResult.data || []) as Array<Record<string, unknown>>,
         categoryRows: (categoriesResult.data || []) as Array<Record<string, unknown>>,
@@ -748,7 +847,12 @@ export default function Home() {
       writeBrowserCache(CATALOG_CACHE_KEY, payload);
       applyCatalog(payload);
     }
-    void loadCatalog();
+    void loadCatalog().catch(() => {
+      if (!mounted) return;
+      setCatalogProducts([]);
+      setCatalogCategories([]);
+      setCatalogLoading(false);
+    });
     return () => {
       mounted = false;
     };
@@ -1015,6 +1119,21 @@ export default function Home() {
       '_blank',
     );
   }
+  function consultBackupProduct(product: Product) {
+    const message = [
+      'Olá! Vi este modelo no catálogo temporário da Meu Vício.',
+      `Modelo: ${product.name}`,
+      `Categoria: ${product.category}`,
+      `Cor: ${product.color}`,
+      `Tamanhos registrados no backup: ${(product.registeredSizes || []).join(', ') || 'não informados'}`,
+      'Pode confirmar as fotos, o preço e a disponibilidade atual?',
+    ].join('\n');
+    window.open(
+      `https://wa.me/${settings.whatsappPrimary}?text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
 
   const whatsappContacts = [
     {
@@ -1024,13 +1143,13 @@ export default function Home() {
       detail: settings.whatsappPrimary,
       demo: false,
     },
-    {
+    ...(!usingBackupCatalog ? [{
       id: 'atendimento-2',
       name: settings.whatsappSecondaryLabel || 'Atendimento 2',
       number: settings.whatsappSecondary,
       detail: settings.whatsappSecondary,
       demo: false,
-    },
+    }] : []),
   ];
   return (
     <main className="site-shell min-h-screen overflow-x-hidden bg-white text-[#1e1e1e]">
@@ -1045,6 +1164,7 @@ export default function Home() {
         categories={catalogCategories}
         selectedCategory={category}
         cartCount={cartCount}
+        readOnlyCatalog={usingBackupCatalog}
         setCartOpen={setCartOpen}
         favoritesCount={favorites.length}
         showFavoritesOnly={showFavoritesOnly}
@@ -1368,6 +1488,16 @@ export default function Home() {
             </div>
           </div>
         </div>
+        {usingBackupCatalog && (
+          <div
+            className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950"
+            role="status"
+          >
+            Catálogo temporário baseado no backup de 22/09. As fotos não estão
+            disponíveis agora; preços e tamanhos são referências antigas e
+            precisam ser confirmados com a loja pelo WhatsApp.
+          </div>
+        )}
         <div className="results-row">
           <span>
             <strong>{catalogLoading ? '—' : filteredProducts.length}</strong>{' '}
@@ -1429,20 +1559,30 @@ export default function Home() {
                         fill={isFavorite ? 'currentColor' : 'none'}
                       />
                     </button>
-                    <button
-                      className="product-image-open"
-                      type="button"
-                      onClick={() => setImagePreviewProduct(product)}
-                      aria-label={`Abrir foto completa de ${product.name}`}
-                    >
-                      <img
-                        style={imageAdjustStyle(product.imageAdjust)}
-                        src={product.image}
-                        alt={`${product.name} - ${product.color}`}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </button>
+                    {usingBackupCatalog ? (
+                      <div
+                        className="backup-image-placeholder"
+                        aria-label={`Foto temporariamente indisponível para ${product.name}`}
+                      >
+                        <ImageOff size={28} strokeWidth={1.5} />
+                        <span>Foto temporariamente indisponível</span>
+                      </div>
+                    ) : (
+                      <button
+                        className="product-image-open"
+                        type="button"
+                        onClick={() => setImagePreviewProduct(product)}
+                        aria-label={`Abrir foto completa de ${product.name}`}
+                      >
+                        <img
+                          style={imageAdjustStyle(product.imageAdjust)}
+                          src={product.image}
+                          alt={`${product.name} - ${product.color}`}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </button>
+                    )}
                     <span className="product-color-dot" title={product.color} />
                   </div>
                   <div className="product-info">
@@ -1455,12 +1595,16 @@ export default function Home() {
                         <h3>{product.name}</h3>
                       </div>
                       <strong className="product-price">
-                        {money(product.price)}
+                        {usingBackupCatalog ? 'Consulte o valor' : money(product.price)}
                       </strong>
                     </div>
                     <p>{product.description}</p>
                     <div className="available-row">
-                      <span>Tamanhos disponíveis</span>
+                      <span>
+                        {usingBackupCatalog
+                          ? 'Tamanhos registrados no backup'
+                          : 'Tamanhos disponíveis'}
+                      </span>
                       <div className="available-sizes">
                         {availableSizes.slice(0, 6).map((option) => (
                           <span key={option.label}>{option.label}</span>
@@ -1473,9 +1617,16 @@ export default function Home() {
                     <button
                       className="choose-button"
                       type="button"
-                      onClick={() => setActiveProduct(product)}
+                      onClick={() =>
+                        usingBackupCatalog
+                          ? consultBackupProduct(product)
+                          : setActiveProduct(product)
+                      }
                     >
-                      Escolher tamanho <ArrowRight size={16} />
+                      {usingBackupCatalog
+                        ? 'Confirmar pelo WhatsApp'
+                        : 'Escolher tamanho'}{' '}
+                      <ArrowRight size={16} />
                     </button>
                   </div>
                 </article>
