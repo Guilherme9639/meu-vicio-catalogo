@@ -244,7 +244,8 @@
         "38",
         "39",
         "40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-2",
@@ -259,7 +260,8 @@
         "41",
         "42",
         "43"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-3",
@@ -274,7 +276,8 @@
         "41",
         "42",
         "43"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-4",
@@ -289,7 +292,8 @@
         "37",
         "38",
         "39"
-      ]
+      ],
+      "price": 80
     },
     {
       "id": "backup-5",
@@ -304,7 +308,8 @@
         "37",
         "38",
         "39"
-      ]
+      ],
+      "price": 80
     },
     {
       "id": "backup-6",
@@ -319,7 +324,8 @@
         "37",
         "38",
         "39"
-      ]
+      ],
+      "price": 150
     },
     {
       "id": "backup-7",
@@ -333,7 +339,8 @@
         "35",
         "36",
         "37"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-8",
@@ -345,7 +352,8 @@
       "sizes": [
         "36",
         "37"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-9",
@@ -359,7 +367,8 @@
         "35",
         "36",
         "37"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-10",
@@ -371,7 +380,8 @@
       "sizes": [
         "34",
         "35"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-11",
@@ -386,7 +396,8 @@
         "41",
         "42",
         "43"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-12",
@@ -402,7 +413,8 @@
         "37",
         "39",
         "40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-13",
@@ -419,7 +431,8 @@
         "38",
         "39",
         "40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-14",
@@ -431,7 +444,8 @@
       "sizes": [
         "42",
         "43"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-15",
@@ -443,7 +457,8 @@
       "sizes": [
         "34",
         "36"
-      ]
+      ],
+      "price": 180
     },
     {
       "id": "backup-16",
@@ -455,7 +470,8 @@
       "sizes": [
         "43",
         "44"
-      ]
+      ],
+      "price": 100
     },
     {
       "id": "backup-17",
@@ -469,7 +485,8 @@
         "38",
         "43",
         "44"
-      ]
+      ],
+      "price": 160
     },
     {
       "id": "backup-18",
@@ -480,7 +497,8 @@
       "description": "",
       "sizes": [
         "36"
-      ]
+      ],
+      "price": 200
     },
     {
       "id": "backup-19",
@@ -491,7 +509,8 @@
       "description": "",
       "sizes": [
         "36"
-      ]
+      ],
+      "price": 200
     },
     {
       "id": "backup-20",
@@ -503,7 +522,8 @@
       "sizes": [
         "38",
         "39"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-21",
@@ -514,7 +534,8 @@
       "description": "",
       "sizes": [
         "36"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-22",
@@ -525,7 +546,8 @@
       "description": "",
       "sizes": [
         "37"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-23",
@@ -536,7 +558,8 @@
       "description": "",
       "sizes": [
         "37"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-24",
@@ -548,7 +571,8 @@
       "sizes": [
         "35",
         "38"
-      ]
+      ],
+      "price": 200
     },
     {
       "id": "backup-25",
@@ -559,7 +583,8 @@
       "description": "",
       "sizes": [
         "37"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-26",
@@ -570,7 +595,8 @@
       "description": "",
       "sizes": [
         "35"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-27",
@@ -584,7 +610,8 @@
         "35",
         "36",
         "37"
-      ]
+      ],
+      "price": 180
     },
     {
       "id": "backup-28",
@@ -598,7 +625,8 @@
         "36",
         "39",
         "40"
-      ]
+      ],
+      "price": 130
     },
     {
       "id": "backup-29",
@@ -610,7 +638,8 @@
       "sizes": [
         "36",
         "37"
-      ]
+      ],
+      "price": 180
     },
     {
       "id": "backup-30",
@@ -621,7 +650,8 @@
       "description": "",
       "sizes": [
         "35"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-31",
@@ -636,7 +666,8 @@
         "37",
         "38",
         "39"
-      ]
+      ],
+      "price": 120
     },
     {
       "id": "backup-32",
@@ -651,7 +682,8 @@
         "37",
         "38",
         "39"
-      ]
+      ],
+      "price": 120
     },
     {
       "id": "backup-33",
@@ -666,7 +698,8 @@
         "38",
         "39",
         "40"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-34",
@@ -678,7 +711,8 @@
       "sizes": [
         "33",
         "39"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-35",
@@ -692,7 +726,8 @@
         "35",
         "37",
         "39"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-36",
@@ -704,7 +739,8 @@
       "sizes": [
         "37",
         "38"
-      ]
+      ],
+      "price": 120
     },
     {
       "id": "backup-37",
@@ -715,7 +751,8 @@
       "description": "",
       "sizes": [
         "37"
-      ]
+      ],
+      "price": 180
     },
     {
       "id": "backup-38",
@@ -728,7 +765,8 @@
         "33",
         "35",
         "39"
-      ]
+      ],
+      "price": 120
     },
     {
       "id": "backup-39",
@@ -746,7 +784,8 @@
         "38",
         "39",
         "40"
-      ]
+      ],
+      "price": 120
     },
     {
       "id": "backup-40",
@@ -758,7 +797,8 @@
       "sizes": [
         "35",
         "37"
-      ]
+      ],
+      "price": 170
     },
     {
       "id": "backup-41",
@@ -770,7 +810,8 @@
       "sizes": [
         "22",
         "23/24"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-42",
@@ -783,7 +824,8 @@
         "19",
         "20",
         "22"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-43",
@@ -795,7 +837,8 @@
       "sizes": [
         "19",
         "20"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-44",
@@ -806,7 +849,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "22"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-45",
@@ -819,7 +863,8 @@
         "23/24",
         "27/28",
         "29/30"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-46",
@@ -832,7 +877,8 @@
         "25/26",
         "27/28",
         "31/32"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-47",
@@ -843,7 +889,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-48",
@@ -856,7 +903,8 @@
         "19",
         "20",
         "21"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-49",
@@ -868,7 +916,8 @@
       "sizes": [
         "20",
         "22"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-50",
@@ -879,7 +928,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "22"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-51",
@@ -890,7 +940,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "23/24"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-52",
@@ -905,7 +956,8 @@
         "27/28",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-53",
@@ -917,7 +969,8 @@
       "sizes": [
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-54",
@@ -930,7 +983,8 @@
         "27/28",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-55",
@@ -941,7 +995,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "31/32"
-      ]
+      ],
+      "price": 64
     },
     {
       "id": "backup-56",
@@ -952,7 +1007,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "25/26"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-57",
@@ -966,7 +1022,8 @@
         "27/28",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-58",
@@ -980,7 +1037,8 @@
         "27/28",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-59",
@@ -992,7 +1050,8 @@
       "sizes": [
         "27/28",
         "33/34"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-60",
@@ -1003,7 +1062,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "35/36"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-61",
@@ -1014,7 +1074,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "35/36"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-62",
@@ -1027,7 +1088,8 @@
         "27/28",
         "29/30",
         "33/34"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-63",
@@ -1040,7 +1102,8 @@
         "25/26",
         "27/28",
         "31/32"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-64",
@@ -1054,7 +1117,8 @@
         "25/26",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-65",
@@ -1066,7 +1130,8 @@
       "sizes": [
         "27/28",
         "31/32"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-66",
@@ -1080,7 +1145,8 @@
         "27/28",
         "29/30",
         "31/32"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-67",
@@ -1092,7 +1158,8 @@
       "sizes": [
         "25/26",
         "29/30"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-68",
@@ -1106,7 +1173,8 @@
         "25/26",
         "27/28",
         "29/30"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-69",
@@ -1119,7 +1187,8 @@
         "23/24",
         "27/28",
         "29/30"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-70",
@@ -1130,7 +1199,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "45/46"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-71",
@@ -1141,7 +1211,8 @@
       "description": "",
       "sizes": [
         "45/46"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-72",
@@ -1158,7 +1229,8 @@
         "41/42",
         "43/44",
         "45/46"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-73",
@@ -1173,7 +1245,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 55
     },
     {
       "id": "backup-74",
@@ -1186,7 +1259,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-75",
@@ -1201,7 +1275,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 74
     },
     {
       "id": "backup-76",
@@ -1216,7 +1291,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 74
     },
     {
       "id": "backup-77",
@@ -1231,7 +1307,8 @@
         "41/42",
         "43/44",
         "45/46"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-78",
@@ -1243,7 +1320,8 @@
       "sizes": [
         "35/36",
         "37/38"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-79",
@@ -1259,7 +1337,8 @@
         "39/40",
         "41/42",
         "43/44"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-80",
@@ -1272,7 +1351,8 @@
         "33/34",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-81",
@@ -1283,7 +1363,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-82",
@@ -1295,7 +1376,8 @@
       "sizes": [
         "33/34",
         "43/44"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-83",
@@ -1307,7 +1389,8 @@
       "sizes": [
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-84",
@@ -1318,7 +1401,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 84
     },
     {
       "id": "backup-85",
@@ -1329,7 +1413,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-86",
@@ -1341,7 +1426,8 @@
       "sizes": [
         "33/34",
         "41/42"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-87",
@@ -1354,7 +1440,8 @@
         "33/34",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-88",
@@ -1367,7 +1454,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 74
     },
     {
       "id": "backup-89",
@@ -1380,7 +1468,8 @@
         "33/34",
         "35/36",
         "39/40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-90",
@@ -1394,7 +1483,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-91",
@@ -1409,7 +1499,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-92",
@@ -1423,7 +1514,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-93",
@@ -1435,7 +1527,8 @@
       "sizes": [
         "33/34",
         "39/40"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-94",
@@ -1449,7 +1542,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-95",
@@ -1463,7 +1557,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-96",
@@ -1475,7 +1570,8 @@
       "sizes": [
         "35/36",
         "39/40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-97",
@@ -1486,7 +1582,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-98",
@@ -1497,7 +1594,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "39/40"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-99",
@@ -1510,7 +1608,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-100",
@@ -1522,7 +1621,8 @@
       "sizes": [
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-101",
@@ -1533,7 +1633,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "43/44"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-102",
@@ -1546,7 +1647,8 @@
         "33/34",
         "35/36",
         "41/42"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-103",
@@ -1557,7 +1659,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "35/36"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-104",
@@ -1568,7 +1671,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "41/42"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-105",
@@ -1580,7 +1684,8 @@
       "sizes": [
         "33/34",
         "41/42"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-106",
@@ -1592,7 +1697,8 @@
       "sizes": [
         "33/34",
         "41/42"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-107",
@@ -1603,7 +1709,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 50
     },
     {
       "id": "backup-108",
@@ -1618,7 +1725,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-109",
@@ -1629,7 +1737,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "37/38"
-      ]
+      ],
+      "price": 74
     },
     {
       "id": "backup-110",
@@ -1640,7 +1749,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 74
     },
     {
       "id": "backup-111",
@@ -1651,7 +1761,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-112",
@@ -1663,7 +1774,8 @@
       "sizes": [
         "35/36",
         "37/38"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-113",
@@ -1678,7 +1790,8 @@
         "37/38",
         "39/40",
         "43/44"
-      ]
+      ],
+      "price": 55
     },
     {
       "id": "backup-114",
@@ -1691,7 +1804,8 @@
         "35/36",
         "37/38",
         "41/42"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-115",
@@ -1705,7 +1819,8 @@
         "37/38",
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-116",
@@ -1721,7 +1836,8 @@
         "41/42",
         "43/44",
         "45/46"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-117",
@@ -1733,7 +1849,8 @@
       "sizes": [
         "39/40",
         "41/42"
-      ]
+      ],
+      "price": 55
     },
     {
       "id": "backup-118",
@@ -1744,7 +1861,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "39/40"
-      ]
+      ],
+      "price": 45
     },
     {
       "id": "backup-119",
@@ -1755,7 +1873,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "41/42"
-      ]
+      ],
+      "price": 70
     },
     {
       "id": "backup-120",
@@ -1767,7 +1886,8 @@
       "sizes": [
         "39/40",
         "43/44"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-121",
@@ -1780,7 +1900,8 @@
         "39/40",
         "41/42",
         "43/44"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-122",
@@ -1794,7 +1915,8 @@
         "35/36",
         "37/38",
         "39/40"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-123",
@@ -1807,7 +1929,8 @@
         "33/34",
         "35/36",
         "39/40"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-124",
@@ -1818,7 +1941,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "39/40"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-125",
@@ -1829,7 +1953,8 @@
       "description": "Conforto e estilo para acompanhar a rotina.",
       "sizes": [
         "43/44"
-      ]
+      ],
+      "price": 55
     },
     {
       "id": "backup-126",
@@ -1840,7 +1965,8 @@
       "description": "Clássico brasileiro para usar em todos os momentos.",
       "sizes": [
         "33/34"
-      ]
+      ],
+      "price": 40
     },
     {
       "id": "backup-127",
@@ -1852,7 +1978,8 @@
       "sizes": [
         "37/38",
         "43/44"
-      ]
+      ],
+      "price": 55
     },
     {
       "id": "backup-128",
@@ -1865,7 +1992,8 @@
         "37/38",
         "39/40",
         "43/44"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-129",
@@ -1877,7 +2005,8 @@
       "sizes": [
         "43/44",
         "45/46"
-      ]
+      ],
+      "price": 65
     },
     {
       "id": "backup-130",
@@ -1891,7 +2020,8 @@
         "37/38",
         "39/40",
         "43/44"
-      ]
+      ],
+      "price": 60
     },
     {
       "id": "backup-131",
@@ -1904,7 +2034,8 @@
         "39/40",
         "41/42",
         "43/44"
-      ]
+      ],
+      "price": 65
     }
   ]
 }

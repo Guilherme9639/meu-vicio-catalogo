@@ -68,6 +68,7 @@ type BackupCatalogPayload = {
     name: string;
     category: string;
     color: string;
+    price: number;
     tag?: string;
     description: string;
     sizes: string[];
@@ -781,7 +782,7 @@ export default function Home() {
           );
           return {
             ...row,
-            price: 0,
+            price: row.price,
             image: '/products/havaianas-branco.png',
             imageAdjust: DEFAULT_IMAGE_ADJUST,
             sizes,
@@ -1493,9 +1494,9 @@ export default function Home() {
             className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950"
             role="status"
           >
-            Catálogo temporário baseado no backup de 22/09. As fotos não estão
-            disponíveis agora; preços e tamanhos são referências antigas e
-            precisam ser confirmados com a loja pelo WhatsApp.
+            Catálogo temporário baseado no backup de 22/09. As fotos estão
+            indisponíveis; valores e tamanhos são os registrados nessa data e
+            devem ser confirmados com a loja pelo WhatsApp.
           </div>
         )}
         <div className="results-row">
@@ -1595,7 +1596,7 @@ export default function Home() {
                         <h3>{product.name}</h3>
                       </div>
                       <strong className="product-price">
-                        {usingBackupCatalog ? 'Consulte o valor' : money(product.price)}
+                        money(product.price)
                       </strong>
                     </div>
                     <p>{product.description}</p>
