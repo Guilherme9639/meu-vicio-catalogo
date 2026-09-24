@@ -1596,7 +1596,7 @@ export default function Home() {
                         <h3>{product.name}</h3>
                       </div>
                       <strong className="product-price">
-                        money(product.price)
+                        {money(product.price)}
                       </strong>
                     </div>
                     <p>{product.description}</p>
